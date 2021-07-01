@@ -1,6 +1,0 @@
-0 : Isect risk prescription -> low implementation
-0' : Isect risk prescription -> low implementation
-	but with IR implemented in Federal and AMA, the percentage taked from fire prescriptions (this scenario is not used or discussed)
-1 : Insect risk prescription -> high implementation (final vertion)
-
-0, 0', 1 : climate scenario -> MIROC5 RCP 8.5

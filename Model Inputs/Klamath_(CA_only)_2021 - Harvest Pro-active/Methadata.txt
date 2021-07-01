@@ -1,3 +1,0 @@
-0 : Resistence area -> 2%
-
-1 : Resistence area -> 5%
