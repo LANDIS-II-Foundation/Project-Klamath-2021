@@ -1,0 +1,3 @@
+..1 -> climatic data from "ca_klamath_miroc585.csv"
+..2 -> climatic data from "ca_klamath_miroc585.csv"
+..Clim2 -> climatic data from "ca_klamath_canesm85.csv"
