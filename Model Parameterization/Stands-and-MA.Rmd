@@ -1,0 +1,337 @@
+---
+title: "Stands and Managment Areas maps"
+author: "Vincent BISQUAY GRACIA"
+date: "2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+# I. Set up
+
+Used pakages :
+
+```{r setup, message=FALSE, warning=FALSE}
+wd = "C:/Users/181248/Documents/181248/LANDIS II/R_calculus"
+setwd(wd)
+library(raster)
+library(rgdal)
+library(devtools)
+library(magrittr)
+library(sf)
+library(nngeo)
+
+```
+
+
+3 rasters are imported :
+
+The raster layer Ecoregions *ER_OnlyCA* has the extent of the study zone (The Californian part of the Klamath mountains).
+
+The two raster layers Managment Areas *Ownership_TotKlamath* and Stands *Stands_TotKlamath* have an extent superior to the study zone (the Oregon part of the Klamath mountain is also contained).
+
+```{r import}
+
+Ownership_TotKlamath = 
+  paste(wd,"/Study_site/E4_ownership_BAU_v4.tif",
+        sep = "") %>% raster()
+
+Stands_TotKlamath = 
+  paste(wd,"/Study_site/E4_stands_BAU_v5.tif",
+        sep = "") %>% raster()
+
+ER_OnlyCA = 
+  paste(wd,"/Study_site/ecoregions_v2.tif",
+        sep = "") %>% raster()
+
+# this have the extent we want
+
+```
+
+
+# II. Selection of the Ownership and Stand areas included in the study area
+
+## II.a) A shapefile with all the borders of the study area is created
+
+Polygons are created with the Ecoregions raster. Then, all the polygons contained are merged in an unique polygon *Study site* that have the extent of the study area.
+
+```{r poly}
+
+ER_OnlyCA[ER_OnlyCA == 0] <- NA # We don't want the background
+ER_OnlyCA_poly = rasterToPolygons(ER_OnlyCA, fun=function(x){x > 0}, dissolve = T)
+
+Study_site = ER_OnlyCA_poly %>% st_as_sf %>%
+  st_union %>% st_remove_holes %>% st_as_sf
+
+plot(Study_site, main = "Figure 1: Borders of the study area")
+
+
+```
+
+
+## II.b) All cells out of the study area are set to NA
+
+In this fist step, all the cells of the Stand raster or the Ownership layer that are not in the Study Area are set to NA.
+
+```{r filter}
+Ownership_OnlyCA_select = mask(Ownership_TotKlamath, Study_site)
+Stands_OnlyCA_select = mask(Stands_TotKlamath, Study_site)
+
+par(mfrow=c(2,2))
+plot(Ownership_TotKlamath, main = "Figure 2.a: Ownership layer", xaxt="n", yaxt="n")
+plot(Ownership_OnlyCA_select, main = "Figure 2.b: Ownership in study area", xaxt="n",
+     yaxt="n")
+plot(Stands_TotKlamath, main = "Figure 2.c: Stands layer", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA_select, main = "Figure 2.d: Stands in study area", xaxt="n", yaxt="n")
+
+```
+
+
+```{r rc1}
+print(c(ER_OnlyCA@ncols, ER_OnlyCA@nrows))
+print(c(Ownership_OnlyCA_select@ncols, Ownership_OnlyCA_select@nrows))
+print(c(Stands_OnlyCA_select@ncols, Stands_OnlyCA_select@nrows))
+
+```
+
+
+## II.c) The rasters are croped to the study area extent
+
+```{r crop}
+
+Ownership_OnlyCA_Crop = crop(Ownership_OnlyCA_select,ER_OnlyCA)
+Stands_OnlyCA_Crop = crop(Stands_OnlyCA_select,ER_OnlyCA)
+
+par(mfrow=c(2,2))
+plot(Ownership_OnlyCA_select, main = "Figure 3.a: Ownership in study area", xaxt="n",
+     yaxt="n")
+plot(Ownership_OnlyCA_Crop, main = "Figure 3.b: Ownership croped", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA_select, main = "Figure 3.c: Stands in study area", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA_Crop, main = "Figure 3.d: Stands croped", xaxt="n", yaxt="n")
+
+```
+
+The plots seems identical at this sage.
+
+```{r rc2}
+print(c(ER_OnlyCA@ncols, ER_OnlyCA@nrows))
+print(c(Ownership_OnlyCA_Crop@ncols, Ownership_OnlyCA_Crop@nrows))
+print(c(Stands_OnlyCA_Crop@ncols, Stands_OnlyCA_Crop@nrows))
+
+```
+
+However, the number of rows and columns of the obtained layers (`r toString(Stands_OnlyCA_Crop@ncols)`, `r toString(Stands_OnlyCA_Crop@nrows)`) is different than the targeted one (`r toString(ER_OnlyCA@ncols)`, `r toString(ER_OnlyCA@nrows)`)
+
+
+## II.d) A resampling is done to have the same resolution
+
+```{r resample}
+Ownership_OnlyCA = resample(Ownership_OnlyCA_Crop, ER_OnlyCA, method="ngb")
+Stands_OnlyCA = resample(Stands_OnlyCA_Crop, ER_OnlyCA, method="ngb")
+
+par(mfrow=c(2,2))
+plot(Ownership_OnlyCA_Crop, main = "Figure 4.a: Ownership croped", xaxt="n", yaxt="n")
+plot(Ownership_OnlyCA, main = "Figure 4.b: Ownership resampled", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA_Crop, main = "Figure 4.c: Stands croped", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA, main = "Figure 4.d: Stands resampled", xaxt="n", yaxt="n")
+
+```
+
+
+```{r rc3}
+print(c(ER_OnlyCA@ncols, ER_OnlyCA@nrows))
+print(c(Ownership_OnlyCA@ncols, Ownership_OnlyCA@nrows))
+print(c(Stands_OnlyCA@ncols, Stands_OnlyCA@nrows))
+
+```
+
+
+This time the resolution is the same.
+
+
+# II.e) The obtained layers are exported
+
+The *datatype* parameter is important, LANDIS-II works only with integers for these two layers. For a raster as heavy as *Stands_OnlyCA*, the data type "INT4S" is the only possibility.
+
+```{r exp}
+Ownership_OnlyCA[is.na(Ownership_OnlyCA[])] = 0
+Stands_OnlyCA[is.na(Stands_OnlyCA[])] = 0
+
+writeRaster(Ownership_OnlyCA,
+            filename  = "C:/Users/181248/Documents/181248/LANDIS II/R_calculus/Study_site/Ownership_OnlyCA.tif",
+            format = "GTiff", datatype ="INT1U",overwrite=T)
+
+writeRaster(Stands_OnlyCA,
+            filename  = "C:/Users/181248/Documents/181248/LANDIS II/R_calculus/Study_site/Stands_OnlyCA.tif",
+            format = "GTiff", datatype ="INT4S",overwrite=T)
+
+```
+
+
+
+# III. Creation of the Resistence Management Areas
+
+The Pro-active management scenario have a resistence prescription. This consists on identifying climate refugias and apply a productive management with species traditionaly used on such places.
+
+As these refugias concentrate an important part of the landscape investement (continuing of the plantation) and economical insights, a buffer zone is created with intensive fire and insects prescriptions.
+
+## III.a) Identification of the climate refugias
+
+Soil moisture : BAU, 1st year
+
+```{r sm}
+
+Ownership_OnlyCA = paste0(wd, "Study_site/Ownership_OnlyCA.tif") %>% raster()
+
+CRSRef = crs(Ownership_OnlyCA)
+NrowRef = Ownership_OnlyCA@nrows
+NcolRef = Ownership_OnlyCA@ncols
+ResRef = res(Ownership_OnlyCA)[1]
+XminRef = Ownership_OnlyCA@extent@xmin
+XmaxRef = Ownership_OnlyCA@extent@xmax
+YminRef = Ownership_OnlyCA@extent@ymin
+YmaxRef = Ownership_OnlyCA@extent@ymax
+
+FreqTable = freq(Ownership_OnlyCA, merge=T) %>% as.data.frame()
+
+SoilMoist = paste0(wd, "Study_site/Annual-water-budget-1.img") %>% raster()
+
+plot(SoilMoist)
+
+
+Q = quantile(SoilMoist, probs = c(0.05, 0.95))
+
+Q3 = as.numeric(Q[2])
+
+values(SoilMoist)[values(SoilMoist) < Q3] = NA
+
+values(SoilMoist)[values(SoilMoist) > 0] = 11
+
+SoilMoist = raster(vals=getValues(SoilMoist),
+                    nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
+                    xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
+
+freq(SoilMoist, merge=T) %>% as.data.frame()
+
+plot(SoilMoist)
+
+```
+
+## III.b) Creation of the buffer zone
+
+```{r buf}
+Buf = buffer(SoilMoist, width=300)
+
+freq(Buf, merge=T) %>% as.data.frame()
+
+values(Buf)[values(Buf) == 1] = 12
+
+Buf = raster(vals=getValues(Buf),
+                    nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
+                    xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
+
+freq(Buf, merge=T) %>% as.data.frame()
+
+plot(Buf)
+
+```
+
+
+```{r}
+
+New_Ma = cover(SoilMoist, Buf, Ownership_OnlyCA)
+
+plot(New_Ma)
+
+freq(New_Ma, merge=T) %>% as.data.frame() %>% tail()
+
+```
+
+```{r stand}
+
+SoilMoist[is.na(SoilMoist)] = 0
+
+Buf[is.na(Buf)] = 0
+
+StandRefugia = Stands_OnlyCA + SoilMoist + Buf
+
+plot(StandRefugia)
+
+writeRaster(StandRefugia,
+filename =  paste0(wd,"Study_site/Stand_CA_Refugias.tif"),
+format = "GTiff", datatype ="INT4S",overwrite=T)
+
+```
+
+
+```{r verif}
+
+
+names(New_Ma) = "New_Ma"
+names(StandRefugia) = "StandRefugia"
+
+### Stacking lets us see where they overlap
+Stack = stack(New_Ma,StandRefugia)
+
+### This will show where all the duplicates exist. 
+Stack_df = as.data.frame(Stack)
+Val = unique(Stack_df[ , 1:2 ])
+
+Ndup = sum(duplicated(Val[,2]))
+
+Dupl = subset(Val, duplicated(Val[,2]))
+
+for(i in c(1:Ndup)){
+  DupStand = Dupl[i,2]
+  DupMA = Stack$New_Ma[Stack$StandRefugia==DupStand] %>% unique()
+  
+  if(DupMA[1] %in% c(11,12)) {
+    Select_Ma = DupMA[1]
+    No_Ma = DupMA[2]
+    
+  }else{
+    Select_Ma = DupMA[2]
+    No_Ma = DupMA[1]}
+  
+  Stack$New_Ma[Stack$StandRefugia==DupStand &Stack$New_Ma==No_Ma] = Select_Ma
+}
+
+
+### And write the new management file
+### This can be done in reverse, to change stands to a given managment. 
+
+MA_Refugia = Stack$New_Ma
+
+writeRaster(MA_Refugia,
+filename =  paste0(wd,"Study_site/Ownership_CA_Refugias.tif"),
+format = "GTiff", datatype ="INT1U",overwrite=T)
+```
+
+# VI. Plot of the Management areas
+
+```{r MA}
+
+pal.11 = colorRampPalette(c("white", "grey", "purple","grey","tomato","green4","green","yellow","red","grey","grey"))
+
+pal.13 = colorRampPalette(c("white", "grey", "purple","grey","tomato","green4","green","yellow","red","grey","grey", "cyan","blue"))
+
+pal.R = colorRampPalette(c("white", "grey", "grey","grey","grey","grey","grey","grey","grey","grey","grey", "cyan","blue"))
+
+par(mfrow=c(2,2))
+plot(Ownership_OnlyCA, main="Managment areas (BAU and Adaptability)",
+     col=pal.11(11))
+plot(MA_Refugia, main="Managment areas (Pro-Active)",
+     col=pal.13(13))
+plot(MA_Refugia, main="Resistence areas",
+     col=pal.R(13))
+
+data.frame("Management area" =c("Unmanaged","Federal","Unmanaged","Tribal Area","PIF", "PNIF",
+                                "Matrix timberlands", "AMA","Unmanaged","Unmanaged")) %>%
+  kable(caption = "Management areas map code")
+
+```
+
+
+

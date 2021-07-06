@@ -1,0 +1,15 @@
+LandisData "Climate Config"				
+		
+ClimateTimeSeries			Daily_SequencedYears
+ClimateFile				ca_klamath_miroc585.csv		<<ca_klamath_canesm85.csv
+ClimateFileFormat			Daily_Temp-K_Precip-mmDay
+SpinUpClimateTimeSeries		Daily_SequencedYears
+SpinUpClimateFile			ca_klamath_miroc585.csv		<<ca_klamath_canesm85.csv
+SpinUpClimateFileFormat		Daily_Temp-K_Precip-mmDay
+
+UsingFireClimate			yes
+FineFuelMoistureCode			85
+DuffMoistureCode			8
+DroughtCode				15
+FirstDayFire				10
+LastDayFire 				360

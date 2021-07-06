@@ -1,0 +1,51 @@
+LandisData  "Dynamic Biomass Fuels"
+
+Timestep  1
+
+>> Extention used to compute the fire managment in Biomass Harvest extention
+
+>> Species Fuel Coefficients (default value 1 if not listed)
+>> 		 Fuel 
+>> Species 	 Coefficient 
+>> -------- 	 ----------- 
+
+HardwoodMaximum 15 << required
+
+DeadFirMaxAge 25 << required
+
+FuelTypes
+
+>> Fuel Base	Age Range	Species
+>> Type	Type
+>> ---  ------	---------	----------------------------------------
+   1	Conifer	0 to 40		AbieGran AbieMagn CaloDecu PseuMenz << Abies magnifica used to remplace ABPRSH, Doi: 10.1111/j.1654-1103.2010.01244.x.
+   2	Conifer	41 to 80	AbieGran AbieMagn CaloDecu PseuMenz 
+   3	Conifer	81 to 3000	AbieGran AbieMagn CaloDecu PseuMenz 
+
+   4	Conifer	0 to 40		PinuLamb PinuMont PinuPond 
+   5	Conifer	41 to 80	PinuLamb PinuMont PinuPond 
+   6	Conifer	81 to 1500	PinuLamb PinuMont PinuPond 
+
+>>  10	Deciduous 0 to 40	AcerMacr AlnuRubr << young deciduous 
+>>  11	Deciduous 41 to 1000	AcerMacr AlnuRubr << old deciduous
+
+  12	Deciduous 0 to 1000	ArbuMenz ChryChry LithDens QuerChry QuerGarr QuerKell 
+  13	Conifer  0 to 1000	FX_R_SEED NOFX_R_SEED NOFX_NOR_SEED	 
+  14	Conifer  0 to 1000	NOFX_R_SEED NOFX_NOR_SEED
+ 
+
+
+DisturbanceConversionTable
+   90		10		RxFire
+   90		4		Pre_Comthin
+   90		6		FireRisk-LightThinning
+   91		15		MxFire
+   91		10		FireRisk-ModerateThinning
+
+
+MapFileNames		DFFS-output/FuelType-{timestep}.img  
+
+
+PctConiferFileName fire/PctConifer-{timestep}.img
+
+PctDeadFirFileName fire/PctDeadFir-{timestep}.img
