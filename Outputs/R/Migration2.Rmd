@@ -1,0 +1,853 @@
+---
+title: "Migration"
+author: "Vincent BISQUAY GRACIA"
+date: "2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# I. Set up
+
+Used pakages :
+
+```{r setup, message=FALSE, warning=FALSE}
+
+setwd(
+  "D:/Users/181248/Documents/R")
+library(raster)
+library(rgdal)
+library(devtools)
+library(sf)
+library(nngeo)
+library(ggplot2)
+library(ggrepel)
+library(cowplot)
+#install_github("jeffreyevans/spatialEco")
+library(spatialEco)
+library(magrittr)
+library(svMisc)
+
+```
+
+```{r data}
+BAU_inputBM = 
+  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest BAU/..1/biomass/"
+Adapty_inputBM = 
+  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest Adaptability/..1/biomass/"
+ProAct_inputBM =
+  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest Pro-active/..1/biomass/"
+
+```
+
+The ownership raster, created in ANNEX XXX is used as reference. Its informations will serve to homogenise all the rasters, as many of the LANDIS-II outputs doesn't have projection system.
+
+```{r ref}
+OnlyCA = raster(
+  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest BAU/..1/Ownership_OnlyCA.tif")
+CRSRef = crs(OnlyCA)
+NrowRef = OnlyCA@nrows
+NcolRef = OnlyCA@ncols
+ResRef = res(OnlyCA)[1]
+XminRef = OnlyCA@extent@xmin
+XmaxRef = OnlyCA@extent@xmax
+YminRef = OnlyCA@extent@ymin
+YmaxRef = OnlyCA@extent@ymax
+
+```
+
+
+# II. Calculus of the variables
+
+## II.A Raster used
+
+### II.A.1. Altitude raster
+
+To compute the mean altitude of the species, an altitude raster is used ( /!\ ask source to Charles).
+Its extent is obtained using the raster of reference.
+
+```{r alt}
+
+AltTot =
+  raster("D:/Users/181248/Documents/CA_elev_merged_clipped_epsg5070.tif")
+
+Alt = crop(AltTot, OnlyCA)
+
+par(mfrow=c(2,2))
+plot(AltTot, main = "Figure 1.a: Altitude layer in CA",
+     xaxt="n", yaxt="n")
+plot(Alt, main = "Figure 1.b: Altitude layer in study zone",
+     xaxt="n", yaxt="n")
+plot(OnlyCA, main = "Figure 1.d: Ownership layer (used as reference)",
+     xaxt="n", yaxt="n")
+
+```
+
+```{r soilmoist}
+
+SoilMoistInit =
+  raster("D:/Users/181248/Documents/Annual-water-budget-1.img")
+
+SoilMoist = raster(vals=getValues(SoilMoistInit),
+                    nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
+                    xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
+
+```
+
+### II.A.2. Rasters of biomass by species
+
+  A list *ListNamesTot* containing the 31 species names plus the "Total Biomass" mention is created.
+
+  Another list, *ListData* contains the names of all the biomass output maps of the simulation. There is 1 map per year (year 0 to year 100) and per species (plus the "Total Biomass"), so 3232 maps in total.
+
+```{r init1}
+
+ListData = list.files(
+  path = BAU_inputBM, pattern = "\\.tif$")
+
+SpeciesData = read.csv(
+  "D:/Users/181248/Documents/Species_description.csv")
+ListNames = as.vector(SpeciesData$Name)
+ListNamesTot = c(ListNames[1:30],"TotalBiomass",ListNames[31])
+
+ListScenario=c("BAU","Adapty","ProAct")
+
+```
+
+This *ListData* will be used to import the rasters. All the scenarios have the same.
+
+```{r order}
+
+head(ListData)
+
+```
+
+We observe here that the last simulation (year 100) is at 4th position for each species.
+
+For all species number $i\in[1,32]$, we want to compare the year 0 biomass map to the year 100 biomass map, *i.e.* compare the map number $id_{0} = 100*(i-1)+i$ to the map number $id_{100} = id_{0}+3$.
+
+
+## II.B. Variables used
+
+### II.B.1. Construction of the migration variable
+
+For each species, at each scenario, the mean shift in coordinates and the mean shift in altitude are calculated.
+
+The mean West-Est shift $Xshift_{ij}$ and the mean North-South shift $Yshift_{ij}$ of the species $i$ in the scenario $j$ are calculated as :
+
+$$
+\begin{align*}
+Xshift_{ij} & = C_{ij}(t=100)_{x}-C_{ij}(t=0)_{x} \\
+Yshift_{ij} & = C_{ij}(t=100)_{y}-C_{ij}(t=0)_{y} \\
+\end{align*}
+$$
+
+With :
+
+- $C_{ij}(t=0)_{x}$ and $C_{ij}(t=0)_{y}$ the two coordinates of the centroid of the biomass of the species $i \in [1,32]$ in the scenario $j \in [1,2]$ and at the initial conditions (at year 0). This centroid is calculated weighed by the biomass of each poin.
+
+- $C_{ij}(t=100)_{x}$ and $C_{ij}(t=100)_{y}$ the coordinates of the same centroid but calculated at the end of the simulation (at year 100).
+
+The mean altitude shift $Zshift_{ij}$ of the species $i$ in the scenario $j$ is calculated as :
+
+$$Zshift_{ij} = \overline{Z_{ij}(t=100)}-\overline{Z_{ij}(t=0)}$$
+
+With :
+
+- $\overline{Z_{ij}(t=0)}$ the mean altitude of all the points containing the species $i \in [1,32]$ in the scenario $j \in [1,2]$ and at the initial conditions (at year 0). This mean altitude is calculated weighed by the biomass of each poin.
+
+$\overline{Z_{ij}(t=100)}$ the same, but at the end of the simulation (at year 100).
+
+
+These three operations are done in each one of the scenarios, and all the results are compiled in the dataframe *Results*.
+
+```{r result}
+
+Results = c("Name", "Scenario", "Migration_x", "Migration_y","Migration_Altitude", "Migration_SoilMoist" ,"Distribution", "Group")
+
+```
+
+### II.B.2. Loop
+
+For the species $i$, the previous calculus are done for each one of the scenarios.
+
+```{r cntrd, message=FALSE, warning=FALSE}
+
+for(i in (1:32)){
+  name = ListNamesTot[i]
+  id0 = 100*(i-1)+i
+  id100 = id0+3
+  
+  for(scenario in ListScenario){
+    if(scenario == "BAU") {Input = BAU_inputBM
+    } else if(scenario == "Adapty"){Input = Adapty_inputBM
+    } else {Input = ProAct_inputBM}
+  
+    ## Centroid of the intitial distribution of biomass of the species i(t=0)
+    year0NoDef = paste(Input,ListData[id0],sep="") %>% raster()
+    year0 = raster(vals=getValues(year0NoDef),
+                      nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
+                      xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
+    points0 = rasterToPoints(year0, fun = function(x){x>=1}, spatial = T)
+    Centroid0 = wt.centroid(points0,"layer", sp=T)
+  
+    # Mean altitude of all the points, weighted by the biomass
+    alt0_df = raster::extract(Alt, points0, method="simple", df=T) %>% 
+      cbind(points0$layer)
+    alt0 = weighted.mean(x=alt0_df[,2], w=alt0_df[,3])
+  
+    # Mean soil moisture of all the points, weighted by the biomass
+    sm0_df = raster::extract(SoilMoist, points0, method="simple", df=T) %>% 
+      cbind(points0$layer)
+    sm0 = weighted.mean(x=sm0_df[,2], w=sm0_df[,3])
+  
+    ## Centroid of the final distribution of biomass of the species i(t=100)
+    year100NoDef = paste(Input,ListData[id100],sep="") %>% raster()
+    year100 = raster(vals=getValues(year100NoDef),
+                        nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
+                        xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
+    points100 = rasterToPoints(year100, fun = function(x){x>=1}, spatial = T)
+    Centroid100 = wt.centroid(points100,"layer", sp=T)
+  
+    # Mean altitude of all the points, weighted by the biomass
+    alt100_df = raster::extract(Alt, points100, method="simple", df=T) %>%
+      cbind(points100$layer)
+    alt100 = weighted.mean(x=alt100_df[,2], w=alt100_df[,3])
+  
+   # Mean soil moisture of all the points, weighted by the biomass
+    sm100_df = raster::extract(SoilMoist, points100, method="simple", df=T) %>%
+      cbind(points100$layer)
+    sm100 = weighted.mean(x=sm100_df[,2], w=sm100_df[,3])
+  
+    ## Shift in coordinates of the centroids
+    Migration_x = Centroid0@coords[1]-Centroid100@coords[1]
+    Migration_y = Centroid0@coords[2]-Centroid100@coords[2]
+  
+    # Shift in Altitude
+    Migration_alt = alt100-alt0
+  
+    # Shift in soil moisture
+    Migration_sm = sm100-sm0
+    
+    ### Position of the distribution area and functional group
+    ### of the species i
+  
+    if (name == "TotalBiomass"){ # The total biomass raster
+      #does not correspond to a species, so this values are empty.
+     Distrib = ""
+      Group = ""
+    }else {
+      Distrib = SpeciesData$Situation.of.NE.CA.in.the.distribution.area[which(SpeciesData$Name == name)]
+      Group = SpeciesData$Functional.type.name[which(SpeciesData$Name == name)]
+    }
+  
+    ### Compiling the information in a data frame
+  
+    Results = rbind(Results, c(name, scenario, Migration_x, Migration_y,
+                             Migration_alt, Migration_sm, Distrib, Group))
+    #  progress(i, progress.bar = T)
+  }
+}
+
+```
+
+
+## II.C. Dataframe of measurements
+
+The first row of the dataframe *Results* will be used as column name, and the good type is gived to the data.
+
+```{r df1}
+Results = as.data.frame(Results)
+colnames(Results)=Results[1,] %>% unlist %>% as.character
+Results=Results[-1,]
+
+Results$Migration_x = Results$Migration_x %>%
+  as.character %>% as.numeric
+Results$Migration_y = Results$Migration_y %>%
+  as.character %>% as.numeric
+Results$Migration_Altitude = Results$Migration_Altitude %>%
+  as.character %>% as.numeric
+Results$Migration_SoilMoist = Results$Migration_SoilMoist %>%
+  as.character %>% as.numeric
+
+head(Results)
+
+```
+
+
+The total biomass, the species and the trees species are isolated in others dataframes. Doing a dataframe without the shrubs will be interesting when looking at the distribution area, as it is not evaluated for these organisms.
+
+```{r df3}
+
+TotBiom = subset(Results, Name == "TotalBiomass")
+
+ResultSp = subset(Results, Name != "TotalBiomass")
+
+ResultTree = subset(ResultSp, Distribution != "")
+
+```
+
+
+# III. Analyses of the West-Est and North-South shifts
+
+## III.A. Visualisation of the data
+
+### III.A.1. General behavior of the species
+
+```{r plot0}
+
+ggplot(ResultSp, aes(x=Migration_x, y=Migration_y, label=Name)) +
+  geom_point() +
+  geom_point(data=TotBiom, colour="red")+
+  scale_x_continuous(name= "West-Est Migration") +
+  scale_y_continuous(name = "North-South Migration") +
+  ggtitle(" Figure 3 : Centroid difference of position by species
+          after 100 years (BAU vs adaptability)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_label_repel() +
+  annotate("text", x = -20000, y = -55000, label = "Red : total biomass",
+           colour = "red", fontface="italic") +
+  facet_wrap(~Scenario)
+
+
+```
+
+### III.A.2. Influence of the area of distribution
+
+```{r plot1}
+
+title = ggdraw() + 
+  draw_label(
+    "Figure X",
+    fontface = 'plain', x = 0, hjust = 0, size = 14) +
+    theme(plot.margin = margin(0, 0, 0, 50))
+
+Points = ggplot(ResultTree, aes(x=Migration_x, y=Migration_y, col=Distribution, shape = Distribution)) +
+  geom_point() +
+  scale_x_continuous(name= "") +
+  scale_y_continuous(name = "North-South Migration") +
+  ggtitle("Centroid difference of position by species after 100 years (BAU vs adaptability)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  facet_wrap(~Scenario)
+
+Dens = ggplot(ResultTree, aes(Migration_x, fill=Distribution)) + geom_density(alpha=.5) +
+  xlab("West-Est Migration") + ylab("density") +
+  facet_wrap(~Scenario, ncol=2)
+
+plot_row = plot_grid(Points, Dens, ncol=1, labels="AUTO")
+
+plot_grid(title, plot_row, ncol=1, rel_heights = c(0.1, 0.7))
+
+
+```
+
+```{r plot2}
+
+title = ggdraw() + 
+  draw_label(
+    "Figure X",
+    fontface = 'plain', x = 0, hjust = 0, size = 14) +
+    theme(plot.margin = margin(0, 0, 0, 50))
+
+Points = ggplot(ResultTree, aes(x=Migration_x, y=Migration_y, col=Distribution, shape = Distribution)) +
+  geom_point() +
+  scale_x_continuous(name= "West-Est Migration") +
+  scale_y_continuous(name = "North-South Migration") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  guides(color = FALSE, shape = FALSE) +
+  facet_wrap(~Scenario, nrow=2)
+
+Dens = ggplot(ResultTree, aes(Migration_y, fill=Distribution)) + geom_density(alpha=.5) +
+  xlab("") + ylab("density") +
+  coord_flip() +
+  facet_wrap(~Scenario, nrow=2)
+
+plot_row = plot_grid(Points, Dens, ncol=2, labels="AUTO")
+
+plot_grid(title, plot_row, ncol=1, rel_heights = c(0.1, 0.7))
+
+```
+
+No trends.
+
+### III.A.3. Looking at the type of ligneous species
+
+
+```{r plot3}
+title = ggdraw() + 
+  draw_label(
+    "Figure 4: Centroid migration by type of ligneous,
+    BAU vs adaptability. Zoom on West-Est direction",
+    fontface = 'plain', x = 0, hjust = 0, size = 14) +
+    theme(plot.margin = margin(0, 0, 0, 50))
+
+ResultSp$LargeGroup = "Shrub"
+
+ResultSp$LargeGroup[which(ResultSp$Group == "Abies dry" |
+                            ResultSp$Group == "Abies mesic" |
+                            ResultSp$Group == "Conifer dry" |
+                            ResultSp$Group == "Conifer mesic")] = "Conifer"
+
+ResultSp$LargeGroup[which(ResultSp$Group == "Hardwood mesic" |
+                            ResultSp$Group == "Hardwood dry" |
+                            ResultSp$Group == "Hardwood dry2")]= "Hardwood"
+
+Points = ggplot(ResultSp, aes(x=Migration_x, y=Migration_y, col=LargeGroup, shape = LargeGroup)) +
+  geom_point() +
+  scale_x_continuous(name= "") +
+  scale_y_continuous(name = "North-South Migration") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  facet_wrap(~Scenario)
+
+Dens = ggplot(ResultSp, aes(Migration_x, fill=LargeGroup)) + geom_density(alpha=.5) +
+  xlab("West-Est Migration") + ylab("density") +
+  facet_wrap(~Scenario, ncol=2)
+
+plot_row = plot_grid(Points, Dens, ncol=1, labels="AUTO")
+
+plot_grid(title, plot_row, ncol=1, rel_heights = c(0.1, 0.7))
+
+```
+
+```{r plot4}
+
+title = ggdraw() + 
+  draw_label(
+    "Figure 5: Centroid migration by type of ligneous,
+    BAU vs adaptability. Zoom on North-South direction",
+    fontface = 'plain', x = 0, hjust = 0, size = 14) +
+    theme(plot.margin = margin(0, 0, 0, 50))
+
+Points = ggplot(ResultSp, aes(x=Migration_x, y=Migration_y, col=LargeGroup, shape = LargeGroup)) +
+  geom_point() +
+  scale_x_continuous(name= "West-Est Migration") +
+  scale_y_continuous(name = "North-South Migration") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  guides(color = FALSE, shape = FALSE) +
+  facet_wrap(~Scenario, nrow=2)
+
+Dens = ggplot(ResultSp, aes(Migration_y, fill=LargeGroup)) + geom_density(alpha=.5) +
+  xlab("") + ylab("density") +
+  coord_flip() +
+  facet_wrap(~Scenario, nrow=2)
+
+plot_row = plot_grid(Points, Dens, ncol=2, labels="AUTO")
+
+plot_grid(title, plot_row, ncol=1, rel_heights = c(0.1, 0.7))
+
+```
+
+### III.A.4. Looking at the moisture preferencies
+
+```{r plot5}
+
+ResultTree$WaterBehavior = "Shrub"
+
+ResultTree$WaterBehavior[which(ResultTree$Group == "Abies dry" |
+                            ResultTree$Group == "Hardwood dry" |
+                            ResultTree$Group == "Conifer dry" |
+                            ResultTree$Group == "Hardwood dry2")] = "Dry"
+
+ResultTree$WaterBehavior[which(ResultTree$Group == "Hardwood mesic" |
+                            ResultTree$Group == "Abies mesic" |
+                            ResultTree$Group == "Conifer mesic")]= "Mesic"
+
+title = ggdraw() + 
+  draw_label(
+    "Figure 6: Centroid migration by moisture preferencies,
+    BAU vs adaptability. Zoom on West-Est Migration direction",
+    fontface = 'plain', x = 0, hjust = 0, size = 14) +
+    theme(plot.margin = margin(0, 0, 0, 50))
+
+Points = ggplot(ResultTree, aes(x=Migration_x, y=Migration_y, col=WaterBehavior, shape = WaterBehavior)) +
+  geom_point() +
+  scale_x_continuous(name= "") +
+  scale_y_continuous(name = "North-South Migration") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  facet_wrap(~Scenario)
+
+Dens = ggplot(ResultTree, aes(Migration_x, fill=WaterBehavior)) + geom_density(alpha=.5) +
+  xlab("West-Est Migration") + ylab("density") +
+  facet_wrap(~Scenario, ncol=2)
+
+plot_row = plot_grid(Points, Dens, ncol=1, labels="AUTO")
+
+plot_grid(title, plot_row, ncol=1, rel_heights = c(0.1, 0.7))
+
+```
+
+```{r plot6}
+
+title = ggdraw() + 
+  draw_label(
+    "Figure 7: Centroid migration by moisture preferencies,
+    BAU vs adaptability. Zoom on North-South direction",
+    fontface = 'plain', x = 0, hjust = 0, size = 14) +
+    theme(plot.margin = margin(0, 0, 0, 50))
+
+Points = ggplot(ResultTree, aes(x=Migration_x, y=Migration_y, col=WaterBehavior, shape = WaterBehavior)) +
+  geom_point() +
+  scale_x_continuous(name= "West-Est Migration") +
+  scale_y_continuous(name = "North-South Migration") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  guides(color = FALSE, shape = FALSE) +
+  facet_wrap(~Scenario, nrow = 2)
+
+Dens = ggplot(ResultTree, aes(Migration_y, fill=WaterBehavior)) + geom_density(alpha=.5) +
+  xlab("") + ylab("density") +
+  coord_flip() +
+  facet_wrap(~Scenario, nrow=2)
+
+plot_row = plot_grid(Points, Dens, ncol=2, labels="AUTO")
+
+plot_grid(title, plot_row, ncol=1, rel_heights = c(0.1, 0.7))
+
+```
+
+## III.B. Statistical analyses
+
+
+### III.B.1. West_Est axes
+
+```{r norm2}
+shapiro.test(ResultSp$Migration_x[which(ResultSp$Scenario=="BAU")])
+
+shapiro.test(ResultSp$Migration_x[which(ResultSp$Scenario=="Adapty")])
+
+shapiro.test(ResultSp$Migration_x[which(ResultSp$Scenario=="ProAct")])
+
+```
+
+The p-value is significant, so the normality is invalidated. As the initial conditions of the two scenarios are the same, the means we want to compare come from paired samples. The test of mean comparison to use is then the Wilcoxon Rank Sum and Signed Rank Test.
+
+```{r comp2}
+
+Xmean_BAU = mean(ResultSp$Migration_x[which(ResultSp$Scenario=="BAU")])
+Xsd_BAU = sd(ResultSp$Migration_x[which(ResultSp$Scenario=="BAU")])
+
+Xmean_Adapty = mean(ResultSp$Migration_x[which(ResultSp$Scenario=="Adapty")])
+Xsd_Adapty = sd(ResultSp$Migration_x[which(ResultSp$Scenario=="Adapty")])
+
+Xmean_ProAct = mean(ResultSp$Migration_x[which(ResultSp$Scenario=="ProAct")])
+Xsd_ProAct = sd(ResultSp$Migration_x[which(ResultSp$Scenario=="ProAct")])
+
+kable(data.frame("X_coordinate_Mean" = c(Xmean_BAU,Xmean_Adapty,Xmean_ProAct), "Standard_error" = c(Xsd_BAU, Xsd_Adapty,Xsd_ProAct),
+           row.names = c("Business as usual","Adaptability","Pro-Active")),caption = "Mortality depending on the scenario")
+
+```
+
+
+```{r stat2}
+
+wilcox.test(ResultSp$Migration_x~ResultSp$Scenario, paired = T)
+
+```
+
+The hight variability is is due to the species effect. No Glm (because )
+
+```{r dif}
+
+DifTot = c("Name", "Scenario","Xdif", "Ydif", "Altdif", "smdif")
+
+for(sp in ListNamesTot) {
+
+  for(scenario in c("Adapty", "ProAct")){
+    BAU_X = Results$Migration_x[which(Results$Scenario=="BAU" & Results$Name==sp)]
+    X = Results$Migration_x[which(Results$Scenario==scenario & Results$Name==sp)]
+    Xdif = (BAU_X-X)/BAU_X
+    
+    BAU_Y = Results$Migration_y[which(Results$Scenario=="BAU" & Results$Name==sp)]
+    Y = Results$Migration_y[which(Results$Scenario==scenario & Results$Name==sp)]
+    Ydif = (BAU_Y-Y)/BAU_Y
+    
+    BAU_Alt = Results$Migration_Altitude[which(Results$Scenario=="BAU" & Results$Name==sp)]
+    Alt = Results$Migration_Altitude[which(Results$Scenario==scenario & Results$Name==sp)]
+    Altdif = (BAU_Alt-Alt)/BAU_Alt
+    
+    BAU_sm = Results$Migration_SoilMoist[which(Results$Scenario=="BAU" & Results$Name==sp)]
+    sm = Results$Migration_SoilMoist[which(Results$Scenario==scenario & Results$Name==sp)]
+    smdif = (BAU_sm-sm)/BAU_sm
+    
+    DifTot = rbind(DifTot, c(sp, scenario, Xdif, Ydif, Altdif, smdif))
+    
+  }
+
+}
+
+DifTot = as.data.frame(DifTot)
+colnames(DifTot)=DifTot[1,] %>% unlist %>% as.character
+DifTot=DifTot[-1,]
+
+Dif = subset(DifTot, Name != "TotalBiomass")
+
+j=c(3:4)
+
+Dif[ , j] = apply(Dif[ , j], 2,
+                    function(x) as.numeric(as.character(x)))
+
+```
+
+The total biomass, the species and the trees species are isolated in others dataframes. Doing a dataframe without the shrubs will be interesting when looking at the distribution area, as it is not evaluated for these organisms.
+
+```{r df2}
+
+TotBiom = subset(Results, Name == "TotalBiomass")
+
+ResultSp = subset(Results, Name != "TotalBiomass")
+
+ResultTree = subset(ResultSp, Distribution != "")
+
+```
+
+```{r bxplt}
+
+ggplot(Dif, aes(x=Name, y=Xdif, col = Scenario)) +
+  geom_point() +
+  ggtitle("relative diference of migration (BAU taked as reference)")+
+   xlab("Species") +
+  ylab("X relative difference of migration") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 90))
+
+```
+
+
+### III.B.2. North-South direction
+
+```{r norm1}
+shapiro.test(Results$Migration_y[which(Results$Scenario=="BAU")])
+
+shapiro.test(Results$Migration_y[which(Results$Scenario=="Adapty")])
+
+shapiro.test(Results$Migration_y[which(Results$Scenario=="ProAct")])
+
+```
+
+The p-value is significant, so the normality is invalidated. As the initial conditions of the two scenarios are the same, the means we want to compare come from paired samples. The test of mean comparison to use is then the Wilcoxon Rank Sum and Signed Rank Test.
+
+
+```{r comp1}
+
+Ymean_BAU = mean(ResultSp$Migration_y[which(ResultSp$Scenario=="BAU")])
+Ysd_BAU = sd(ResultSp$Migration_y[which(ResultSp$Scenario=="BAU")])
+
+Ymean_Adapty = mean(ResultSp$Migration_y[which(ResultSp$Scenario=="Adapty")])
+Ysd_Adapty = sd(ResultSp$Migration_y[which(ResultSp$Scenario=="Adapty")])
+
+Ymean_ProAct = mean(ResultSp$Migration_y[which(ResultSp$Scenario=="ProAct")])
+Ysd_ProAct = sd(ResultSp$Migration_y[which(ResultSp$Scenario=="ProAct")])
+
+kable(data.frame("Y_coordinate_Mean" = c(Ymean_BAU,Ymean_Adapty,Ymean_ProAct), "Standard_error" = c(Ysd_BAU, Ysd_Adapty,Ysd_ProAct),
+           row.names = c("Business as usual","Adaptability","Pro-Active")),caption = "Mortality depending on the scenario")
+
+```
+
+
+```{r stat1}
+
+wilcox.test(ResultSp$Migration_y~ResultSp$Scenario, paired = T)
+
+```
+
+The hight variability is is due to the species effect.
+
+
+# IV. Analyses of Altitude shifts
+
+## IV.A. Visualisation of the data
+
+```{r altp1}
+ggplot(ResultSp[ResultSp$Scenario=="BAU",],
+             aes(x=reorder(Name,Migration_Altitude), y=Migration_Altitude)) +
+  geom_point() +
+  geom_hline(yintercept=0, linetype="dashed", colour="red") +
+  #geom_point(data=TotBiom, colour="red")+
+  xlab("Species") +
+  ylab("Elevation gain") +
+  ggtitle("Mean elevation by species after 100 years (BAU)") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 90))
+  
+ggplot(ResultSp[ResultSp$Scenario=="Adapty",],
+              aes(x=reorder(Name,Migration_Altitude), y=Migration_Altitude)) +
+  geom_point() +
+  geom_hline(yintercept=0,  linetype="dashed", colour="red") +
+  #geom_point(data=TotBiom, colour="red")+
+  xlab("Species") +
+  ylab("Elevation gain") +
+  ggtitle("Mean elevation by species after 100 years (Adaptability)") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 90))
+
+ggplot(ResultSp[ResultSp$Scenario=="ProAct",],
+              aes(x=reorder(Name,Migration_Altitude), y=Migration_Altitude)) +
+  geom_point() +
+  geom_hline(yintercept=0,  linetype="dashed", colour="red") +
+  #geom_point(data=TotBiom, colour="red")+
+  xlab("Species") +
+  ylab("Elevation gain") +
+  ggtitle("Mean elevation by species after 100 years (Pro-Active)") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 90))
+
+
+```
+
+
+
+```{r altp2}
+ggplot(ResultTree, aes(x=Distribution, y=Migration_Altitude, col=Scenario)) +
+  geom_boxplot() +
+  geom_hline(yintercept=0, linetype="dotted") +
+  stat_summary(fun=mean, geom="point", shape=4, size=3) +
+ scale_x_discrete(name ="Situation in the distribution area", 
+                    limits=c("N","M","XXM","S","XS","XXS")) +
+  ylab("Elevation gain") +
+  ggtitle("Mean elevation by spacial situation after 100 years") +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+ggplot(ResultSp, aes(x=Group, y=Migration_Altitude, col=Scenario)) +
+  geom_boxplot() +
+  geom_hline(yintercept=0, linetype="dotted") +
+  stat_summary(fun=mean, geom="point", shape=4, size=3) +
+  xlab("Functional group") +
+  ylab("Elevation gain") +
+  ggtitle("Mean elevation by functional group after 100 years") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = -20))
+
+#plot_grid(Areap, Groupp, nrow=2, labels="AUTO")
+
+```
+
+
+### IV.B. Statistical analyses
+
+
+# V. Analyses of Soil Moisture shifts
+
+## IV.A. Visualisation of the data
+
+```{r sm1}
+ggplot(ResultSp[ResultSp$Scenario=="BAU",],
+             aes(x=reorder(Name,Migration_SoilMoist), y=Migration_SoilMoist)) +
+  geom_point() +
+  geom_hline(yintercept=0, linetype="dashed", colour="red") +
+  #geom_point(data=TotBiom, colour="red")+
+  xlab("Species") +
+  ylab("Moisture gain") +
+  ggtitle("Mean moisture by species after 100 years (BAU)") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 90))
+  
+ggplot(ResultSp[ResultSp$Scenario=="Adapty",],
+              aes(x=reorder(Name,Migration_SoilMoist), y=Migration_SoilMoist)) +
+  geom_point() +
+  geom_hline(yintercept=0,  linetype="dashed", colour="red") +
+  #geom_point(data=TotBiom, colour="red")+
+  xlab("Species") +
+  ylab("Elevation gain") +
+  ggtitle("Mean elevation by species after 100 years (adaptability)") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 90))
+
+ggplot(ResultSp[ResultSp$Scenario=="ProAct",],
+              aes(x=reorder(Name,Migration_SoilMoist), y=Migration_SoilMoist)) +
+  geom_point() +
+  geom_hline(yintercept=0,  linetype="dashed", colour="red") +
+  #geom_point(data=TotBiom, colour="red")+
+  xlab("Species") +
+  ylab("Elevation gain") +
+  ggtitle("Mean elevation by species after 100 years (adaptability)") +
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(angle = 90))
+
+```
+
+Shrubs go in the abandoned places.
+
+```{r rastermoist1}
+FxR0 = paste0(BAU_inputBM,"FX_R_SEED-0.tif") %>% raster()
+FxR100 = paste0(BAU_inputBM,"FX_R_SEED-100.tif") %>% raster()
+
+NFxR0 = paste0(BAU_inputBM,"NOFX_R_SEED-0.tif") %>% raster()
+NFxR100 = paste0(BAU_inputBM,"NoFX_R_SEED-100.tif") %>% raster()
+
+NFxNR0 = paste0(BAU_inputBM,"NOFX_NOR_SEED-0.tif") %>% raster()
+NFxNR100 = paste0(BAU_inputBM,"NoFX_NOR_SEED-100.tif") %>% raster()
+
+Xer0 = FxR0 + NFxR0 + NFxNR0
+
+Xer100 = FxR100 + NFxR100 + NFxNR100
+
+par(mfrow=c(1,2))
+
+plot(Xer0)
+plot(Xer100)
+
+
+ChamNoot0 = paste0(BAU_inputBM,"ChamNoot-0.tif") %>% raster()
+ChamNoot100 = paste0(BAU_inputBM,"ChamNoot-100.tif") %>% raster()
+
+ChamNoot0 = paste0(BAU_inputBM,"NOFX_R_SEED-0.tif") %>% raster()
+ChryChry100 = paste0(BAU_inputBM,"NoFX_R_SEED-100.tif") %>% raster()
+
+AbieGran0 = paste0(BAU_inputBM,"AbieGran-0.tif") %>% raster()
+AbieGran100 = paste0(BAU_inputBM,"AbieGran-100.tif") %>% raster()
+
+Hig0 = ChamNoot0 + ChamNoot0 + AbieGran0
+
+Hig100 = ChamNoot100 + ChamNoot100 + AbieGran100
+
+par(mfrow=c(1,2))
+
+plot(Hig0)
+plot(Hig100)
+
+```
+
+
+```{r sm2}
+
+ResultTree$WaterBehavior = "Shrub"
+
+ResultTree$WaterBehavior[which(ResultTree$Group == "Abies dry" |
+                            ResultTree$Group == "Hardwood dry" |
+                            ResultTree$Group == "Conifer dry" |
+                            ResultTree$Group == "Hardwood dry2")] = "Dry"
+
+ResultTree$WaterBehavior[which(ResultTree$Group == "Hardwood mesic" |
+                            ResultTree$Group == "Abies mesic" |
+                            ResultTree$Group == "Conifer mesic")]= "Mesic"
+
+ggplot(ResultTree, aes(x=WaterBehavior, y=Migration_SoilMoist, col=Scenario)) +
+  geom_boxplot() +
+  geom_hline(yintercept=0, linetype="dotted") +
+  stat_summary(fun=mean, geom="point", shape=4, size=3) +
+ scale_x_discrete(name ="Water preferencies") +
+  ylab("Moisture gain") +
+  ggtitle("Mean soil moisture gain by preferencies after 100 years") +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+ggplot(ResultSp, aes(x=Group, y=Migration_SoilMoist, col=Scenario)) +
+  geom_boxplot() +
+  geom_hline(yintercept=0, linetype="dotted") +
+  stat_summary(fun=mean, geom="point", shape=4, size=3) +
+  xlab("Functional group") +
+  ylab("Moisture gain") +
+  ggtitle("Mean soil moisture gain by functional group after 100 years") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = -20))
+
+#plot_grid(Areap, Groupp, nrow=2, labels="AUTO")
+
+```
+
+
+```{r fin}
+boxplot(Dif$SoilMoist_Dif)
+
+shapiro.test(Dif$SoilMoist_Dif)
+```
+
+

@@ -1,0 +1,37 @@
+Name,Scientific,English,French,Pictures,,Repartition,Situation of NE CA in the distribution area,Functional type name,,
+AbieAmab,Abies amabilis,Pacific silver fir,Sapin gracieux,,,https://www.fs.fed.us/database/feis/pdfs/Little/abiama.pdf,XXS,Abies mesic,,6
+AbieGran,Abies grandis,grand fir,Sapin de Vancouver,,,https://www.fs.fed.us/database/feis/pdfs/Little/abigra.pdf,S,Abies mesic,,6
+AbieMagn,Abies magnifica,"
+red fir",Sapin rouge,,,,M,Abies mesic,,6
+AcerMacr,Acer macrophyllum,bigleaf maple,érable à grandes feuilles,,,https://www.fs.fed.us/database/feis/pdfs/Little/acemac.pdf,S,Hardwood mesic,,3
+AlnuRhom,Alnus rhombifolia,white alder,/,,,https://www.fs.fed.us/database/feis/pdfs/Little/alnrho.pdf,M,Hardwood mesic,,3
+AlnuRubr,Alnus rubra, red alder,Aulne rouge,,,https://www.fs.fed.us/database/feis/pdfs/Little/alnrub.pdf,S,Hardwood mesic,,3
+ArbuMenz,Arbutus menziesii,Pacific madrone or madrona,arbousier d'Amérique,,,https://www.fs.fed.us/database/feis/pdfs/Little/arbmen.pdf,S,Hardwood dry,,4
+CaloDecu,Calocedrus decurrens,incense cedar,Cèdre à encens,,,"
+https://plants.usda.gov/plantguide/pdf/pg_cade27.pdf",M,Conifer dry,,2
+ChamNoot,Cupressus nootkatensis,Nootka/Alaska cypress, Cyprès de Nootka,,,"
+https://www.fpl.fs.fed.us/documnts/usda/amwood/224alask.pdf",XXS,Conifer mesic,,1
+ChryChry,Chrysolepis chrysophylla,golden chinquapin,/,,,"
+https://www.fs.fed.us/database/feis/plants/tree/chrchr/all.html",M,Hardwood dry,,4
+FX_R_SEED,Shrub fuctional type,"N fixer, resprout after fire",,,,,,Shrub,,5
+LithDens,"
+Lithocarpus densiflorus", tanoak,chêne à tan,,,https://www.fs.fed.us/database/feis/pdfs/Little/litden.pdf,M,Hardwood dry,,4
+NOFX_NOR_SEED,,,,,,,,Shrub,,5
+NOFX_R_SEED,,,,,,,,Shrub,,5
+PiceBrew,Picea breweriana, Brewer spruce,épicéa de Brewer,,,https://www.fs.fed.us/database/feis/pdfs/Little/picbre.pdf,XXM,Conifer mesic,,1
+PiceSitc,Picea sitchensis,Sitka spruce,Épicéa de Sitka,,,https://www.fs.fed.us/database/feis/pdfs/Little/picsit.pdf,XS,Abies mesic,,6
+PinuAlbi,Pinus albicaulis, whitebark pine,pin à écorce blanche,,,https://www.fs.fed.us/database/feis/pdfs/Little/pinalb.pdf,XS,Abies dry,,7
+PinuAtte, Pinus attenuata,knobcone pine,/,,,https://www.fs.fed.us/database/feis/pdfs/Little/pinatt.pdf,XXM,Abies mesic,,6
+PinuCont,Pinus contorta,lodgepole pine,Pin tordu,,,https://www.fs.fed.us/database/feis/pdfs/Little/pincon.pdf,XS,Abies mesic,,6
+PinuJeff,Pinus jeffreyi,Jeffrey pine,pin de Jeffrey,,,https://www.fs.fed.us/database/feis/pdfs/Little/pinjef.pdf,N,Conifer dry,,2
+PinuLamb,Pinus lambertiana, sugar pine,Pin à sucre,,,https://www.fs.fed.us/database/feis/pdfs/Little/pinlam.pdf,M,Conifer dry,,2
+PinuMont,Pinus monticola,Western white pine,Pin argenté,,,https://www.fs.fed.us/database/feis/pdfs/Little/pinmot.pdf,S,Abies dry,,7
+PinuPond,Pinus ponderosa,ponderosa pine / Mountain pine,pin ponderosa,,,https://www.fs.fed.us/database/feis/pdfs/Little/pinpon.pdf,M,Conifer dry,,2
+PseuMenz,Pseudotsuga menziesii,Douglas-fir,Douglas,,,https://www.fs.fed.us/database/feis/pdfs/Little/psemen.pdf,S,Conifer dry,,2
+QuerChry,Quercus chrysolepis,canyon oak,chêne des canyons,,,https://www.fs.fed.us/database/feis/pdfs/Little/quechr.pdf,N,Hardwood dry2,,8
+QuerDoug,Quercus douglasii, blue oak, chêne bleu,,,https://www.fs.fed.us/database/feis/pdfs/Little/quedou.pdf,N,Hardwood dry,,4
+QuerGarr,Quercus garryana,Oregon oak,chêne de Garry,,,https://www.fs.fed.us/database/feis/pdfs/Little/quegar.pdf,S,Hardwood dry,,4
+QuerKell,Quercus kelloggii,Kellogg oak,chêne de Kellogg,,,https://www.fs.fed.us/database/feis/pdfs/Little/quekel.pdf,M,Hardwood dry,,4
+SequSemp,Sequoia sempervirens,coast redwood, Séquoia toujours vert,,,https://www.fs.fed.us/database/feis/pdfs/Little/seqsem.pdf,N,Conifer mesic,,1
+TaxuBrev,Taxus brevifolia, Pacific yew, If du Pacifique,,,https://www.fs.fed.us/database/feis/pdfs/Little/taxbre.pdf,S,Conifer mesic,,1
+TsugMert,Tsuga mertensiana,mountain hemlock,Pruche subalpine,,,https://www.fs.fed.us/database/feis/pdfs/Little/tsumer.pdf,XXS,Conifer mesic,,1

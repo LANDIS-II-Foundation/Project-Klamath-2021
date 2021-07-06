@@ -1,0 +1,342 @@
+
+################################
+################################
+## Spatialisation des mod?les ##
+## Paulina PINTO 24/11/2017   ##
+################################
+################################
+
+setwd('D:/TD2_spatialisation_modeles/') # for students
+getwd()
+
+# Mon space travail
+setwd('C:/Paulina/_Enseignement/APT/CCRN_ChP/2017/TD2_spatialisation_modeles/')
+
+# Importer tableau de donn?es 
+
+ecoflo<-read.table("D:/TD2_spatialisation_modeles/ecoflo.csv", header=TRUE, sep=";")
+
+# constitution data "calib" & "valid" 
+calib	<- subset(ecoflo, ecoflo$Valid==0)
+valid	<- subset(ecoflo, ecoflo$Valid==1)
+
+sum(calib$Lonnig)
+sum(valid$Lonnig)
+
+# Rappel regresion logistique (mod?le param?trique)
+
+glmloni <- glm(Lonnig ~ pH + I(pH^2)+ CN + RUM + Tmoyan + I (Tmoyan ^2) , data= calib, family = binomial) # Modele complet
+summary(glmloni)
+anova(glmloni, test ="Chisq")
+
+# GAM - (mod?le non param?trique)
+# Les packages permettant la calibration des lod?les GAM
+
+# Installer packages
+install.packages("gam",dependencies=TRUE)
+options(todisk=TRUE)						# sauvegarder sous le disque dur 
+library(gam)
+
+gamloni 	<- gam(Lonnig ~s(pH,4) + s(CN,4) + s(RUM,4), family=binomial,data=calib,na.action=na.exclude)
+summary(gamloni)
+anova(gamloni)  
+
+gamloni1	<- gam(Lonnig ~s(pH,4) + s(CN,4) + s(RUM,4) + s(Tmoyan), family=binomial,data=calib,na.action=na.exclude)
+summary(gamloni1)
+anova(gamloni,gamloni1) # Verification que la variable ajout? est significative
+
+## Evaluation du mod?le
+source("ProfilEcologique.R")  	   # Charge le script contenant la fonction roc
+roc(gamloni1$fitted.values,gamloni1$y) # roc(predictions, observations)
+
+# Calcul de la TSS (indicateur de performance)
+# tss = (0.92+0.91)-1
+
+# Tracer la r?ponse de l'esp?ce selon le mod?le
+mydata <- data.frame(matrix(NA,100,4))
+names(mydata) <-c("pH","CN","RUM","Tmoyan")
+
+# Effet pH
+mydata[,1]<- seq(3,8,length=100) # range of pH from 3-8.5
+mydata[,2]<- 17	# range of C/N from 10 to 35
+mydata[,3]<- 72   # range of RUM from -5.7 to 150
+mydata[,4]<- 10   # range of Tmoyan from 0.65 to 16
+
+fitted_y <-predict(gamloni1,mydata, type="response")
+plot(fitted_y~mydata$pH, type="l", ylim=c(0,0.05))
+
+# Effet CN
+mydata[,1]<- 5 	# range of pH from 3-8.5
+mydata[,2]<- seq(10,35,length=100) # range of C/N from 10 to 35
+mydata[,3]<- 72   # range of RUM from -5.7 to 150
+mydata[,4]<- 10   # range of Tmoyan from 0.65 to 16
+head(mydata)
+fitted_y <-predict(gamloni1,mydata, type="response")
+plot(fitted_y~mydata$CN, type="l", ylim=c(0,0.05))
+
+# Effet RUM
+mydata[,1]<- 5 # range of pH from 3-8.5
+mydata[,2]<- 20 # range of C/N from 10 to 35
+mydata[,3]<- seq(-5.7,150,length=100) # range of RUM from -5.7 to 150
+mydata[,4]<- 10   # range of Tmoyan from 0.65 to 16
+head(mydata)
+
+fitted_y <-predict(gamloni1,mydata, type= "response")
+plot(fitted_y~mydata$RUM, type="l", ylim=c(0,0.005))
+
+#Effet Tmoyan
+mydata[,1]<- 5  # range of pH from 3-8.5
+mydata[,2]<- 20 # range of C/N from 10 to 35
+mydata[,3]<- 60 # range of RUM from -5.7 to 150
+mydata[,4]<- seq(0.65,16,length=100) # range of Tmoyan from 0.65 to 16
+mydata    <-data.frame(mydata)
+names(mydata) <-c("pH","CN","RUM","Tmoyan")
+head(mydata)
+fitted_y <-predict(gamloni1,mydata, type="response")
+plot(fitted_y~mydata$Tmoyan, type="l")
+
+## Spatialiser le mod?le de niche
+## Utilisation des donn?es matritielles ou type raster
+
+## I. Importer et observation de raster sous R
+## importer les variables predictives ("D:/indices_ecolo/1km")
+
+## Les packages permettant la prise en main de raster dans R
+install.packages(c("raster","sp"),dependencies=TRUE)
+options(todisk=TRUE)	# sauvegarder sous le disque dur 
+
+#chargement des packages
+library(raster)
+library(sp)
+
+#Lecture d'un raster stock? sur le disque
+pH	 <- raster("D:/TD2_spatialisation_modeles/indices_ecolo/1km/ph/hdr.adf")
+plot(pH)
+
+#Chargement de rasters libre acc?s (e.g. MNT de la NASA)
+altFRA<-getData('alt', country='FRA', mask=T)
+getData('ISO3') # visualiser les codes
+
+altDEU<-getData('alt', country='DEU', mask=T)
+
+# Les diff?rentes propri?t?s d'un raster:
+
+pH
+
+extent(pH)
+res(pH)
+projection(pH)
+origin(pH)
+
+# Les objets stacks et les bricks du package raster
+# Si n?cessaire d'utiliser des rasters avec plusieurs variables attributaires
+
+CN	 <- raster("D:/TD2_spatialisation_modeles/indices_ecolo/1km/cn/hdr.adf")
+RUM	 <- raster("D:/TD2_spatialisation_modeles/indices_ecolo/1km/rum/hdr.adf")
+RU7	 <- raster("D:/TD2_spatialisation_modeles/indices_ecolo/1km/ru7/hdr.adf")
+Tmoyan <- raster("D:/TD2_spatialisation_modeles/indices_ecolo/1km/tmoy13/hdr.adf")
+#Tmo01  <- raster("D:/TD2_spatialisation_modeles/indices_ecolo/1km/tmoy1/hdr.adf")
+
+	## Je vous laisse faire...
+GDD5   <- raster("D:/indices_ecolo/1km/ssup5/hdr.adf")
+Rg13   <- raster("D:/indices_ecolo/1km/rg13/hdr.adf") 
+P7 	 <- raster("D:/indices_ecolo/1km/p7/hdr.adf")
+BHc7 	 <- raster("D:/indices_ecolo/1km/bhc7/hdr.adf")
+DE7 	 <- raster("D:/indices_ecolo/1km/de7/hdr.adf")
+
+# Construction d'un objet multi couche ayant la m?me ?tendue et r?solution  
+# cette structure rend l'utilisation des couches plus ais?s 
+
+# Cr?er un objet type stack
+RHS		<- stack()
+
+# Ajouter des raster ? cet objet avec la fonction 'addLayer()'
+RHS 		<- addLayer(RHS,pH)
+RHS 		<- addLayer(RHS,CN)
+RHS 		<- addLayer(RHS,RUM)
+
+# Ajouter un nom aux ?l?ments de l'objet stack
+names(RHS)	<- c("pH","CN","RUM")
+plot(RHS)
+
+RHS 		<-addLayer(RHS,RU7)
+
+# Modifidication d'un raster	
+# Changer la projection d'une couche 
+
+projection(pH)
+
+# Appliquer la projection d'une couche de r?f?rence au raster de travail
+projection(RU7)	<-projection(pH)
+
+# Ajouter le raster 'RU7'avec la nouvelle projection
+RHS 			<-addLayer(RHS,RU7)
+
+# Renomer les Layers		  
+names(RHS)		<- c("pH","CN","RUM","RU7")
+plot(RHS)
+
+RHS		<-addLayer(RHS,Tmoyan)
+
+# Verifier l'extention
+extent(pH)
+extent(Tmoyan)
+
+# Changement ? posteriori de d'extension d'une couche
+#extent(xmin, xmax, ymin, ymax)
+
+extent(Tmoyan)	<-c(47493, 1198493, 1617395, 2681395)
+RHS			<-addLayer(RHS,Tmoyan)
+
+# R??chantillonnage un raster avec la fonction 'resample()' m?thode bilinear
+# en fonction d'un raster de r?f?rence, ici pH
+
+Couche_ref	<- intersect(Tmoyan,pH) 
+
+Tmoyre	<-resample(Tmoyan, pH, method="bilinear", progress="text")
+RHS		<-addLayer(RHS,Tmoyre)
+
+names(RHS)		<- c("pH","CN","RUM","RU7","Tmoyan")
+plot(RHS)
+
+#Consulter un des Layers
+RHS[[3]]
+plot(RHS[[3]])
+
+plot(RHS[[1:2]])
+
+# Comment sauvegarder un objet type "Stack" avec la fonction "writeRaster()"
+writeRaster(RHS,filename="D:/TD2_spatialisation_modeles/RHS", overwrite=TRUE) 
+
+# Comment lire un objet de type stack / "brick()"
+my_RHS	<-brick("D:/TD2_spatialisation_modeles/RHS_predictors.grd") # Lire objet RHS
+
+# R??chantillonnage de plusieurs rasters
+# Cr?ation d'un masque d'intersection
+Couche_ref	<- intersect(Tmoyan,pH) 	
+extent(Couche_ref)
+
+multiLayer	<- c(pH,CN,RUM,RU7,Tmoyan)
+RHS		<- stack()
+
+for(i in 1:length(multiLayer))
+{
+Layer	<- resample(multiLayer[[i]], Couche_ref, method="bilinear", progress="text")
+RHS			<- addLayer(RHS,Layer)
+}
+names(RHS)		<- c("pH","CN","RUM","RU7","Tmoyan") # fonction "names" ds nouvelle version
+
+RHS		<-addLayer(RHS,GDD5)
+RHS		<-addLayer(RHS,Tmo01)
+RHS		<-addLayer(RHS,Rg13)
+RHS		<-addLayer(RHS,P7)
+RHS		<-addLayer(RHS,BHc7)
+RHS		<-addLayer(RHS,DE7)
+
+# Spatialiser le modele "gam" avec la fonction "predict()"
+predloni_gam <- predict(RHS,gamloni1,type="response",progress="text")
+
+# Lister le resultat
+predloni_gam 
+
+# Cartographier le raster r?sultant
+plot(predloni_gam)
+
+points(calib$Xl2[calib$Lonni==1],calib$Yl2[calib$Lonni==1], cex =0.2, col="red")
+points(calib$Xl2[calib$Lonni==0],calib$Yl2[calib$Lonni==0], cex =0.2, col="grey")
+
+# Visualiser une partie de la carte
+plot(predloni_gam, xlim=c(200000,1000000), ylim=c(1600000,2300000))
+
+# Spatialiser le modele "glm" avec la fonction "predict()"
+predloni_glm<- predict(RHS,glmloni,type="response",progress="text")
+plot(predloni_glm)
+
+# Diviser la feuille 
+par(mfrow=c(1,2))
+plot(predloni_gam, main="GAM")
+plot(predloni_glm, main="GLM")
+
+# Transformation les valeurs contunues des cellules d'un raster ? des classes 
+# fonction 'reclassify()'
+# e.g. Transformation de Probas en Pr?sence/Absence
+
+roc(gamloni1$fitted.values,gamloni1$y) # roc(predictions, observations)
+
+rc_0 	<- reclassify(predloni_gam, c(0,0.054,0))
+rc_01	<- reclassify(rc_0, c(0.054,1,1))
+plot(rc_01)
+
+rc_0 	<- reclassify(predloni_gam, c(0,0.08,0))
+rc_01	<- reclassify(rc_0, c(0.08,1,1))
+plot(rc_01)
+plot(rc_01, col=c("gray","green"))
+
+points(calib$Xl2[calib$Lonni==1],calib$Yl2[calib$Lonni==1], cex =0.2, col="blue")
+points(calib$Xl2[calib$Lonni==0],calib$Yl2[calib$Lonni==0], cex =0.2, col="grey")
+
+#Autre fa?on de cr?er les classes
+rcl = matrix(ncol=3,nrow=2)
+rcl [,1] <-seq(from=0, to=0.054, by=0.054)
+rcl [,2] <-seq(from=0.054, to=1, by=0.946)
+rcl [,3] <-seq(from=0, to=1, by=1)
+colnames(rcl)	<-c('from','to','by')
+plot(rc_01, col=c("gray","green"))
+
+points(calib$Xl2[calib$Lonni==1],calib$Yl2[calib$Lonni==1], cex =0.2, col="blue")
+points(calib$Xl2[calib$Lonni==0],calib$Yl2[calib$Lonni==0], cex =0.2, col="grey")
+
+# Exporter le raster r?sultant avec la fonction "writeRaster()"
+writeRaster(predloni_gam,"D:/predloni_gam", format="GTiff", overwrite=TRUE)
+
+# Extraction des donn?es d'un raster avec la fonction 'extract()'
+
+# Definition des projections
+# Projection Lambert 93
+projL93="+proj=lcc +lat_1=44 +lat_2=49 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +units=m +no_defs"
+# Projection Lambert 2 ?tendu
+projLII="+proj=lcc +lat_1=46.8 +lat_0=46.8 +lon_0=2.337229166666667 +k_0=0.99987742 +x_0=600000 +y_0=2200000 +a=6378249.2 +b=6356514.999904194 +units=m +no_defs"
+
+# Importer les coordonn?es ? croiser
+
+is.numeric(valid$Xl2)
+is.numeric(valid$Xl2)
+
+# Creation de l'objet contenant les coordonnees : on selection les X et Y du dataframe original (valid) et on defini la projection Lambert 2 ?tendu
+coordLII=SpatialPoints(subset(valid,select=c(Xl2,Yl2)), proj4string=CRS(projLII), bbox = NULL)
+plot(coordLII)
+projection(predloni_gam) <-projLII
+
+#Extraction des donn?es
+p				 <-extract(x=predloni_gam, y=coordLII) 
+
+# On ajoute le r?sultat dans le data.frame 'valid'
+valid$fit_loni_gam <-p
+roc(valid$fit_loni_gam,valid$Lonnig)
+
+## Comparer les deux mod?les (glm vs gam) 
+roc(glmloni$fitted.values,glmloni$y) # roc(predictions, observations)
+
+rc_0_glm 	<- reclassify(predloni_glm, c(0,0.052,0))
+rc_01_glm	<- reclassify(rc_0, c(0.052,1,1))
+
+par(mfrow=c(1,2))
+plot(rc_01)
+plot(rc_01_glm)
+
+# fonction cellStats() permet de calculer des statistiques
+cellStats(rc_01_glm, max)
+cellStats(rc_01_glm, min)
+
+cellStats(Tmoyan, max)
+cellStats(Tmoyan, mean)
+cellStats(Tmoyan, sd)
+
+#Operations spatiales avec la fonction 'overlay()'
+overlay(rc_01,rc_01_glm, fun=sum)
+plot(overlay(rc_01,rc_01_glm, fun=sum)) # fun=mean
+
+overlay(ras1, ras2,fun=function(x,y){return(x-y)})
+
+#method="ngb" (deuxi?me methode re?chantillonnage)
+

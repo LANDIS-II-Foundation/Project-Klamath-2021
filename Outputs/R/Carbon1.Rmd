@@ -1,0 +1,242 @@
+---
+title: "Carbon"
+author: "Vincent Bisquay Gracia"
+date: "12/05/2021"
+output:
+  html_document: default
+  word_document: default
+---
+
+# I. set up
+
+Used pakages :
+
+```{r setup, message=FALSE, warning=FALSE}
+
+setwd(
+  "D:/Users/181248/Documents/R")
+library(magrittr)
+library(cowplot)
+library(ggplot2)
+library(raster)
+library(animation)
+
+```
+
+```{r data}
+CC_input = 
+  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - CC only/"
+Dist_input = 
+  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - CC & disturbances/"
+
+BAU_input =
+  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest BAU/"
+
+```
+
+# II. 
+
+```{r TotC}
+
+CC_NECN_long = paste(CC_input,"NECN-succession-log.csv",sep="") %>% read.csv()
+
+CC_NECN = aggregate(data=CC_NECN_long, cbind(NEEC, SOMTC, AGB, AG_NPPC, BG_NPPC, Litterfall, AgeMortality, MineralN, TotalN, GrossMineralization, C_LiveLeaf, C_LiveFRoot, C_LiveWood, C_DeadWood, C_DeadCRoot, C_DeadLeaf_Struc, C_DeadLeaf_Meta, C_DeadFRoot_Struc, C_DeadFRoot_Meta, C_SOM1surf, C_SOM1soil, C_SOM2, C_SOM3, N_Leaf, N_FRoot, N_Wood, N_CRoot, N_DeadWood, N_DeadCRoot, N_DeadLeaf_Struc, N_DeadLeaf_Meta, N_DeadFRoot_Struc, N_DeadFRoot_Meta, N_SOM1surf, N_SOM1soil, N_SOM2, N_SOM3, SurfStrucNetMin, SurfMetaNetMin, SoilStrucNetMin, SoilMetaNetMin, SOM1surfNetMin, SOM1soilNetMin, SOM2NetMin, SOM3NetMin, TotalNdep, LeachedC, LeachedN, FireCEfflux, FireNEfflux, Nuptake, Nresorbed, TotalSoilN, Nvol, FrassC) ~ Time, mean)
+
+CC_NECN$Scenario = "CC"
+
+
+Dist_NECN_long = paste(Dist_input,"NECN-succession-log.csv",sep="") %>% read.csv()
+
+Dist_NECN = aggregate(data=Dist_NECN_long, cbind(NEEC, SOMTC, AGB, AG_NPPC, BG_NPPC, Litterfall, AgeMortality, MineralN, TotalN, GrossMineralization, C_LiveLeaf, C_LiveFRoot, C_LiveWood, C_DeadWood, C_DeadCRoot, C_DeadLeaf_Struc, C_DeadLeaf_Meta, C_DeadFRoot_Struc, C_DeadFRoot_Meta, C_SOM1surf, C_SOM1soil, C_SOM2, C_SOM3, N_Leaf, N_FRoot, N_Wood, N_CRoot, N_DeadWood, N_DeadCRoot, N_DeadLeaf_Struc, N_DeadLeaf_Meta, N_DeadFRoot_Struc, N_DeadFRoot_Meta, N_SOM1surf, N_SOM1soil, N_SOM2, N_SOM3, SurfStrucNetMin, SurfMetaNetMin, SoilStrucNetMin, SoilMetaNetMin, SOM1surfNetMin, SOM1soilNetMin, SOM2NetMin, SOM3NetMin, TotalNdep, LeachedC, LeachedN, FireCEfflux, FireNEfflux, Nuptake, Nresorbed, TotalSoilN, Nvol, FrassC) ~ Time, mean)
+
+Dist_NECN$Scenario = "Dist"
+
+
+BAU_NECN_long1 = paste(BAU_input,"..1/NECN-succession-log.csv",sep="") %>% read.csv()
+
+BAU_NECN = aggregate(data=BAU_NECN_long1, cbind(NEEC, SOMTC, AGB, AG_NPPC, BG_NPPC, Litterfall, AgeMortality, MineralN, TotalN, GrossMineralization, C_LiveLeaf, C_LiveFRoot, C_LiveWood, C_DeadWood, C_DeadCRoot, C_DeadLeaf_Struc, C_DeadLeaf_Meta, C_DeadFRoot_Struc, C_DeadFRoot_Meta, C_SOM1surf, C_SOM1soil, C_SOM2, C_SOM3, N_Leaf, N_FRoot, N_Wood, N_CRoot, N_DeadWood, N_DeadCRoot, N_DeadLeaf_Struc, N_DeadLeaf_Meta, N_DeadFRoot_Struc, N_DeadFRoot_Meta, N_SOM1surf, N_SOM1soil, N_SOM2, N_SOM3, SurfStrucNetMin, SurfMetaNetMin, SoilStrucNetMin, SoilMetaNetMin, SOM1surfNetMin, SOM1soilNetMin, SOM2NetMin, SOM3NetMin, TotalNdep, LeachedC, LeachedN, FireCEfflux, FireNEfflux, Nuptake, Nresorbed, TotalSoilN, Nvol, FrassC) ~ Time, mean)
+
+BAU_NECN$Scenario = "BAU"
+
+NECN = rbind(CC_NECN, Dist_NECN, BAU_NECN)
+
+```
+
+```{r plot}
+SOMTp = ggplot(NECN, aes(x=Time, y=SOMTC, col=Scenario, shape = Scenario)) +
+  geom_point() +
+  scale_x_continuous(name= "Time (in years)") +
+  scale_y_continuous(name = "SOMTC (g C m-2)") +
+  ggtitle("Evolution of the soil organic mater") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+CDWp = ggplot(NECN, aes(x=Time, y=C_DeadWood, col=Scenario, shape = Scenario)) +
+  geom_point() +
+  scale_x_continuous(name= "Time (in years)") +
+  scale_y_continuous(name = "Dead wood Carbon (g C m-2)") +
+  ggtitle("Evolution of the dead wood carbon") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+AGBp =  ggplot(NECN, aes(x=Time, y=AGB, col=Scenario, shape = Scenario)) +
+  geom_point() +
+  scale_x_continuous(name= "Time (in years)") +
+  scale_y_continuous(name = "Above ground biomass (g C m-2)") +
+  ggtitle("Evolution of the above ground biomass") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+plot_grid(SOMTp, CDWp, AGBp, labels="AUTO", ncol = 2, nrow = 2)
+
+```
+
+
+# III. Perturbations analysis
+
+```{r mort1}
+
+Dist_BDA_Tot = read.csv("D:/Users/181248/Documents/Klamath_(CA_only)_2021 - CC & disturbances/bda_log.csv")
+Dist_BDA = cbind(Dist_BDA_Tot$Time, Dist_BDA_Tot$TotalBiomassMortality) %>% as.data.frame()
+colnames(Dist_BDA) = c("Time", "Mortality")
+
+Dist_BDA = aggregate(Dist_BDA$Mortality, by=list(Time=Dist_BDA$Time), FUN=sum)
+
+colnames(Dist_BDA) = c("Time", "Mortality")
+Dist_BDA$Disturbancy = "Insects"
+
+Dist_scrapple_Tot = read.csv("D:/Users/181248/Documents/Klamath_(CA_only)_2021 - CC & disturbances/scrapple-summary-log.csv")
+Dist_scrapple_Acc = cbind(Dist_scrapple_Tot$SimulationYear,
+                 Dist_scrapple_Tot$TotalBiomassMortalityAccidental) %>% as.data.frame()
+colnames(Dist_scrapple_Acc) = c("Time", "Mortality")
+Dist_scrapple_Acc$Disturbancy = "Fire accidental"
+
+
+Dist_scrapple_Nat = cbind(Dist_scrapple_Tot$SimulationYear,
+                 Dist_scrapple_Tot$TotalBiomassMortalityLightning) %>% as.data.frame()
+colnames(Dist_scrapple_Nat) = c("Time", "Mortality")
+Dist_scrapple_Nat$Disturbancy = "Fire lightning"
+
+Dist_Mortality = rbind(Dist_BDA, Dist_scrapple_Acc, Dist_scrapple_Nat)
+
+```
+
+```{r look}
+ggplot(Dist_BDA_Tot, aes(x=AgentName, y=TotalBiomassMortality)) +
+  geom_bar(stat='identity') +
+  xlab("Type of insect disturbacy") +
+  ylab("Mortality in biomass") +
+  ggtitle("Mortality depending on insect disturbancies") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 30, hjust = 1))
+
+```
+
+
+```{r mort2}
+
+BAU_BDA_Tot = read.csv("D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest BAU1/bda_log.csv")
+BAU_BDA = cbind(BAU_BDA_Tot$Time, BAU_BDA_Tot$TotalBiomassMortality) %>% as.data.frame()
+colnames(BAU_BDA) = c("Time", "Mortality")
+
+BAU_BDA = aggregate(BAU_BDA$Mortality, by=list(Time=BAU_BDA$Time), FUN=sum)
+
+colnames(BAU_BDA) = c("Time", "Mortality")
+BAU_BDA$Disturbancy = "Insects"
+
+
+BAU_scrapple_Tot = read.csv("D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest BAU1/scrapple-summary-log.csv")
+BAU_scrapple_Acc = cbind(BAU_scrapple_Tot$SimulationYear,
+                 BAU_scrapple_Tot$TotalBiomassMortalityAccidental) %>% as.data.frame()
+colnames(BAU_scrapple_Acc) = c("Time", "Mortality")
+BAU_scrapple_Acc$Disturbancy = "Fire accidental"
+
+
+BAU_scrapple_Nat = cbind(BAU_scrapple_Tot$SimulationYear,
+                 BAU_scrapple_Tot$TotalBiomassMortalityLightning) %>% as.data.frame()
+colnames(BAU_scrapple_Nat) = c("Time", "Mortality")
+BAU_scrapple_Nat$Disturbancy = "Fire lightning"
+
+
+BAU_Mortality = rbind(BAU_BDA, BAU_scrapple_Acc, BAU_scrapple_Nat)
+
+```
+
+```{r mort3, message=F, warning=F}
+
+title = ggdraw() + 
+  draw_label(
+    "Figure X",
+    fontface = 'plain', x = 0, hjust = 0, size = 14) +
+    theme(plot.margin = margin(0, 0, 0, 50))
+
+Mort1 = ggplot(Dist_Mortality, aes(x=Time, y=Mortality, color=Disturbancy, group=Disturbancy)) +
+  geom_area(aes(fill=Disturbancy)) +
+  xlab("") +
+  ylab("Mortality in biomass") +
+  ggtitle("Evolution of mortality due to disturbancies (no managment)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Mort2 = ggplot(BAU_Mortality, aes(x=Time, y=Mortality, color=Disturbancy, group=Disturbancy)) +
+  geom_area(aes(fill=Disturbancy)) +
+  xlab("Time (years)") +
+  ylab("Mortality in biomass") +
+  ggtitle("Evolution of mortality due to disturbancies (with managment)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+plot_row = plot_grid(Mort1, Mort2, ncol=1, labels="AUTO")
+
+plot_grid(title, plot_row, ncol=1, rel_heights = c(0.1, 0.7))
+
+title = ggdraw() + 
+  draw_label(
+    "Figure X : Smooth",
+    fontface = 'plain', x = 0, hjust = 0, size = 14) +
+    theme(plot.margin = margin(0, 0, 0, 50))
+
+Mort1 = ggplot(Dist_Mortality, aes(x=Time, y=Mortality, color=Disturbancy, group=Disturbancy)) +
+  geom_smooth(span = 0.1, se=FALSE) +
+  xlab("Time (years)") +
+  ylab("Mortality in biomass") +
+  ggtitle("Evolution of mortality due to disturbancies (no managment)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+Mort2 = ggplot(BAU_Mortality, aes(x=Time, y=Mortality, color=Disturbancy, group=Disturbancy)) +
+  geom_smooth(span = 0.1, se=FALSE) +
+  xlab("Time (years)") +
+  ylab("Mortality in biomass") +
+  ggtitle("Evolution of mortality due to disturbancies (with managment)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+plot_row = plot_grid(Mort1, Mort2, ncol=1, labels="AUTO")
+
+plot_grid(title, plot_row, ncol=1, rel_heights = c(0.1, 0.7))
+
+```
+
+Mean mortality, max, f pics
+
+biomass recover after disturbancy (slope).
+
+
+```{r anim, }
+
+RasterStackI = paste(Dist_input, "scrapple-fire/fire-intensity-1.img", sep="") %>% raster()
+
+RasterStackF = paste(Dist_input, "scrapple-fire/fire-intensity-1.img", sep="") %>% raster()
+
+for (i in 2:100) {
+  
+  RasterI = paste(Dist_input, "scrapple-fire/fire-intensity-",i,".img", sep="") %>% raster()
+  
+  #assign(paste("Year",i, sep=""), Raster)
+  
+  RasterStackI = stack(RasterStackI, RasterI)
+}
+
+
+saveHTML(
+  
+  animate(x=RasterStackI, pause=0.1, maxpixels=100000, n=1, col=terrain.colors(600))
+  
+  , img.name = "Rplot", global.opts = "", single.opts = "",navigator = ani.options("nmax") <= 100 && ani.options("interval") >=0.05, htmlfile = "Animated_Intensity.html")
+
+```
+
+
