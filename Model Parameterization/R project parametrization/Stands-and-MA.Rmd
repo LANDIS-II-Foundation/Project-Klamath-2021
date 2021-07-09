@@ -88,8 +88,6 @@ plot(Stands_OnlyCA_select, main = "Figure 3.d: Stands in study area", xaxt="n", 
 
 ```
 
-
-
 After this operation, the two layers we are modifying present a large number of empty cells that does not exist on the reference layer. Thus, other transformations are needed.
 
 ## II.c) The rasters are croped to the study area extent
@@ -260,23 +258,34 @@ freq(Buf, merge=T) %>% as.data.frame() %>% kable(caption = "Number of cells in t
 
 ```
 
-## III.c) Creation of the buffer zone
+## III.c) Merging the management areas in one layer
 
-The potential climate refugia raster and the buffer zone raster are both merge
+The potential climate refugia raster and the buffer zone raster are merged.
 
 ```{r merge}
 
 Resistence = cover(SoilMoist, Buf)
 
-plot(Resistence)
-
-New_Ma = cover(Resistence, Ownership_OnlyCA)
-
-plot(New_Ma)
-
-freq(New_Ma, merge=T) %>% as.data.frame() %>% tail()
+plot(Resistence, main = "Figure 9: Buffer zone and management ")
 
 ```
+
+After that, the two new management areas are added to the others.
+
+```{r merge2}
+New_Ma = cover(Resistence, Ownership_OnlyCA)
+
+```
+
+## III.d) Export of the completed management area and stand rasters
+
+### III.d.1) Export the new stands raster
+
+To obtain new codes for the cells situated on the resistence and buffer zones, a sum is performed.
+
+This way, the cells in question have a code that is no longer the old one and that is different depending of it is in the resistent area or the buffer zone.
+
+This new layer is then exported.
 
 ```{r stand}
 
