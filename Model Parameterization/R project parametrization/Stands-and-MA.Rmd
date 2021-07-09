@@ -14,13 +14,13 @@ output:
 Used pakages :
 
 ```{r setup, message=FALSE, warning=FALSE}
-wd = "C:/Users/181248/Documents/181248/LANDIS II/R_calculus"
+wd = "D:/Internship 3A/GitHub/Project-Klamath-2021/Model Parameterization"
 setwd(wd)
+library(sf)
 library(raster)
 library(rgdal)
 library(devtools)
 library(magrittr)
-library(sf)
 library(nngeo)
 
 ```
@@ -46,7 +46,7 @@ ER_OnlyCA =
   paste(wd,"/Study_site/ecoregions_v2.tif",
         sep = "") %>% raster()
 
-# this have the extent we want
+# this last one have the extent we want
 
 ```
 
@@ -160,7 +160,7 @@ Ownership_OnlyCA[is.na(Ownership_OnlyCA[])] = 0
 Stands_OnlyCA[is.na(Stands_OnlyCA[])] = 0
 
 writeRaster(Ownership_OnlyCA,
-            filename  = "C:/Users/181248/Documents/181248/LANDIS II/R_calculus/Study_site/Ownership_OnlyCA.tif",
+            filename  = paste0(wd,"/Study_site/Ownership_OnlyCA.tif"),
             format = "GTiff", datatype ="INT1U",overwrite=T)
 
 writeRaster(Stands_OnlyCA,
