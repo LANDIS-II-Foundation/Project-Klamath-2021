@@ -1,7 +1,7 @@
 ---
 title: "Stands and Managment Areas maps"
 author: "Vincent BISQUAY GRACIA"
-date: "2021"
+date: "07/2021"
 output:
   pdf_document: default
   html_document: default
@@ -22,40 +22,38 @@ library(rgdal)
 library(devtools)
 library(magrittr)
 library(nngeo)
+library(knitr)
 
 ```
 
 
 3 rasters are imported :
 
-The raster layer Ecoregions *ER_OnlyCA* has the extent of the study zone (The Californian part of the Klamath mountains).
+The raster layer of the ecoregions *ER_OnlyCA*, has the extent of the study zone (The Californian part of the Klamath mountains).
 
-The two raster layers Managment Areas *Ownership_TotKlamath* and Stands *Stands_TotKlamath* have an extent superior to the study zone (the Oregon part of the Klamath mountain is also contained).
+The two raster layers of the managment areas *Ownership_TotKlamath* and of the stands *Stands_TotKlamath* have an extent superior to the study zone (the Oregon part of the Klamath mountain is also contained).
 
 ```{r import}
 
+ER_OnlyCA = 
+  paste0(wd,"/Study_site/ecoregions_v2.tif") %>% raster()
+
 Ownership_TotKlamath = 
-  paste(wd,"/Study_site/E4_ownership_BAU_v4.tif",
-        sep = "") %>% raster()
+  paste0(wd,"/Study_site/E4_ownership_BAU_v4.tif") %>% raster()
 
 Stands_TotKlamath = 
-  paste(wd,"/Study_site/E4_stands_BAU_v5.tif",
-        sep = "") %>% raster()
+  paste0(wd,"/Study_site/E4_stands_BAU_v5.tif") %>% raster()
 
-ER_OnlyCA = 
-  paste(wd,"/Study_site/ecoregions_v2.tif",
-        sep = "") %>% raster()
-
-# this last one have the extent we want
 
 ```
 
+We want that the management area and stands rasters have the same extent and defintion than the ecoregion one. This will allow all rasters to have the same definition and allow LANDIS-II to compute the landscape properly.
 
 # II. Selection of the Ownership and Stand areas included in the study area
 
 ## II.a) A shapefile with all the borders of the study area is created
 
-Polygons are created with the Ecoregions raster. Then, all the polygons contained are merged in an unique polygon *Study site* that have the extent of the study area.
+Polygons are created with the Ecoregions raster. Then, all the polygons are merged in an unique polygon *Study site* that have the extent of the study area.
 
 ```{r poly}
 
@@ -65,7 +63,9 @@ ER_OnlyCA_poly = rasterToPolygons(ER_OnlyCA, fun=function(x){x > 0}, dissolve = 
 Study_site = ER_OnlyCA_poly %>% st_as_sf %>%
   st_union %>% st_remove_holes %>% st_as_sf
 
+par(mfrow = c(1,2))
 plot(Study_site, main = "Figure 1: Borders of the study area")
+plot(ER_OnlyCA, main = "Figure 2: Reference Layer")
 
 
 ```
@@ -73,29 +73,24 @@ plot(Study_site, main = "Figure 1: Borders of the study area")
 
 ## II.b) All cells out of the study area are set to NA
 
-In this fist step, all the cells of the Stand raster or the Ownership layer that are not in the Study Area are set to NA.
+In this fist step, all the cells of the stand raster and the management area raster that are not in the Study Area are set to NA.
 
 ```{r filter}
 Ownership_OnlyCA_select = mask(Ownership_TotKlamath, Study_site)
 Stands_OnlyCA_select = mask(Stands_TotKlamath, Study_site)
 
 par(mfrow=c(2,2))
-plot(Ownership_TotKlamath, main = "Figure 2.a: Ownership layer", xaxt="n", yaxt="n")
-plot(Ownership_OnlyCA_select, main = "Figure 2.b: Ownership in study area", xaxt="n",
+plot(Ownership_TotKlamath, main = "Figure 3.a: Ownership layer", xaxt="n", yaxt="n")
+plot(Ownership_OnlyCA_select, main = "Figure 3.b: Ownership in study area", xaxt="n",
      yaxt="n")
-plot(Stands_TotKlamath, main = "Figure 2.c: Stands layer", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA_select, main = "Figure 2.d: Stands in study area", xaxt="n", yaxt="n")
+plot(Stands_TotKlamath, main = "Figure 3.c: Stands layer", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA_select, main = "Figure 3.d: Stands in study area", xaxt="n", yaxt="n")
 
 ```
 
 
-```{r rc1}
-print(c(ER_OnlyCA@ncols, ER_OnlyCA@nrows))
-print(c(Ownership_OnlyCA_select@ncols, Ownership_OnlyCA_select@nrows))
-print(c(Stands_OnlyCA_select@ncols, Stands_OnlyCA_select@nrows))
 
-```
-
+After this operation, the two layers we are modifying present a large number of empty cells that does not exist on the reference layer. Thus, other transformations are needed.
 
 ## II.c) The rasters are croped to the study area extent
 
@@ -105,20 +100,25 @@ Ownership_OnlyCA_Crop = crop(Ownership_OnlyCA_select,ER_OnlyCA)
 Stands_OnlyCA_Crop = crop(Stands_OnlyCA_select,ER_OnlyCA)
 
 par(mfrow=c(2,2))
-plot(Ownership_OnlyCA_select, main = "Figure 3.a: Ownership in study area", xaxt="n",
+plot(Ownership_OnlyCA_select, main = "Figure 4.a: Ownership in study area", xaxt="n",
      yaxt="n")
-plot(Ownership_OnlyCA_Crop, main = "Figure 3.b: Ownership croped", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA_select, main = "Figure 3.c: Stands in study area", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA_Crop, main = "Figure 3.d: Stands croped", xaxt="n", yaxt="n")
+plot(Ownership_OnlyCA_Crop, main = "Figure 4.b: Ownership croped", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA_select, main = "Figure 4.c: Stands in study area", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA_Crop, main = "Figure 4.d: Stands croped", xaxt="n", yaxt="n")
 
 ```
 
-The plots seems identical at this sage.
+The plots seems identical to the ecoregion one at this sage.
 
 ```{r rc2}
-print(c(ER_OnlyCA@ncols, ER_OnlyCA@nrows))
-print(c(Ownership_OnlyCA_Crop@ncols, Ownership_OnlyCA_Crop@nrows))
-print(c(Stands_OnlyCA_Crop@ncols, Stands_OnlyCA_Crop@nrows))
+a = c(ER_OnlyCA@ncols, ER_OnlyCA@nrows)
+b = c(Ownership_OnlyCA_Crop@ncols, Ownership_OnlyCA_Crop@nrows)
+c = c(Stands_OnlyCA_Crop@ncols, Stands_OnlyCA_Crop@nrows)
+
+df = rbind(a,b,c) %>% as.data.frame(row.names = c("Ecoregion", "Management area", "Stands"))
+colnames(df) = c("X","Y")
+
+kable(df, caption = "Number of cells by layer after croping")
 
 ```
 
@@ -132,23 +132,27 @@ Ownership_OnlyCA = resample(Ownership_OnlyCA_Crop, ER_OnlyCA, method="ngb")
 Stands_OnlyCA = resample(Stands_OnlyCA_Crop, ER_OnlyCA, method="ngb")
 
 par(mfrow=c(2,2))
-plot(Ownership_OnlyCA_Crop, main = "Figure 4.a: Ownership croped", xaxt="n", yaxt="n")
-plot(Ownership_OnlyCA, main = "Figure 4.b: Ownership resampled", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA_Crop, main = "Figure 4.c: Stands croped", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA, main = "Figure 4.d: Stands resampled", xaxt="n", yaxt="n")
+plot(Ownership_OnlyCA_Crop, main = "Figure 5.a: Ownership croped", xaxt="n", yaxt="n")
+plot(Ownership_OnlyCA, main = "Figure 5.b: Ownership resampled", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA_Crop, main = "Figure 5.c: Stands croped", xaxt="n", yaxt="n")
+plot(Stands_OnlyCA, main = "Figure 5.d: Stands resampled", xaxt="n", yaxt="n")
 
 ```
 
 
 ```{r rc3}
-print(c(ER_OnlyCA@ncols, ER_OnlyCA@nrows))
-print(c(Ownership_OnlyCA@ncols, Ownership_OnlyCA@nrows))
-print(c(Stands_OnlyCA@ncols, Stands_OnlyCA@nrows))
+a = c(ER_OnlyCA@ncols, ER_OnlyCA@nrows)
+b = c(Ownership_OnlyCA@ncols, Ownership_OnlyCA@nrows)
+c = c(Stands_OnlyCA@ncols, Stands_OnlyCA@nrows)
 
+df = rbind(a,b,c) %>% as.data.frame(row.names = c("Ecoregion", "Management area", "Stands"))
+colnames(df) = c("X","Y")
+
+kable(df, caption = "Number of cells by layer after resampling")
 ```
 
 
-This time the resolution is the same.
+This time the resolution is the same. Thus, the layers can be stacked and used in LANDIS-II.
 
 
 # II.e) The obtained layers are exported
@@ -164,7 +168,7 @@ writeRaster(Ownership_OnlyCA,
             format = "GTiff", datatype ="INT1U",overwrite=T)
 
 writeRaster(Stands_OnlyCA,
-            filename  = "C:/Users/181248/Documents/181248/LANDIS II/R_calculus/Study_site/Stands_OnlyCA.tif",
+            filename  = paste0(wd,"/Study_site/Stands_OnlyCA.tif"),
             format = "GTiff", datatype ="INT4S",overwrite=T)
 
 ```
@@ -175,15 +179,11 @@ writeRaster(Stands_OnlyCA,
 
 The Pro-active management scenario have a resistence prescription. This consists on identifying climate refugias and apply a productive management with species traditionaly used on such places.
 
-As these refugias concentrate an important part of the landscape investement (continuing of the plantation) and economical insights, a buffer zone is created with intensive fire and insects prescriptions.
+As these refugias concentrate an important part of the economical insights, a buffer zone is created with intensive fire and insects prescriptions.
 
-## III.a) Identification of the climate refugias
+Some of the rasters used in this part have not a defined system of projection. The one of the management area is used as a reference.
 
-Soil moisture : BAU, 1st year
-
-```{r sm}
-
-Ownership_OnlyCA = paste0(wd, "Study_site/Ownership_OnlyCA.tif") %>% raster()
+```{r ref}
 
 CRSRef = crs(Ownership_OnlyCA)
 NrowRef = Ownership_OnlyCA@nrows
@@ -194,12 +194,25 @@ XmaxRef = Ownership_OnlyCA@extent@xmax
 YminRef = Ownership_OnlyCA@extent@ymin
 YmaxRef = Ownership_OnlyCA@extent@ymax
 
-FreqTable = freq(Ownership_OnlyCA, merge=T) %>% as.data.frame()
+```
 
-SoilMoist = paste0(wd, "Study_site/Annual-water-budget-1.img") %>% raster()
 
-plot(SoilMoist)
+## III.a) Identification of the climate refugias
 
+The first step is to identify the climate change refugias, i.e. zones where the effect of the climate change on the ecosystem (and particularly tree health) is limited comared to the wole landscape.
+
+The proxy used to identify these zones are the soil moisture. This choice is justified and discussed in the report. Among the input files used in LANDIS-II, there is no raster of the soil moisture. The layer used here is the soil moisture modelled on year 1 by the NECN extention, in the scenario Business As Usual.
+
+```{r sm}
+SoilMoist = paste0(wd, "/Study_site/Annual-water-budget-1.img") %>% raster()
+
+plot(SoilMoist, main = "Figure 6: Soil moisture in the study site")
+
+```
+
+The quatile 0.95, i.e. the 5% of the cells with the highest value of soil moisture, is selected (the cells take the value 11, while the others are eraised).
+
+```{r sm1}
 
 Q = quantile(SoilMoist, probs = c(0.05, 0.95))
 
@@ -209,22 +222,31 @@ values(SoilMoist)[values(SoilMoist) < Q3] = NA
 
 values(SoilMoist)[values(SoilMoist) > 0] = 11
 
+```
+
+A raster is created with this quantile using the data of the reference raster.
+
+```{r smr}
+
 SoilMoist = raster(vals=getValues(SoilMoist),
                     nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
                     xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
 
-freq(SoilMoist, merge=T) %>% as.data.frame()
+plot(SoilMoist, main = "Figure 7: Zones with high soil moisture")
 
-plot(SoilMoist)
+freq(SoilMoist, merge=T) %>% as.data.frame() %>% kable(caption = "Number of cells in the potential refugias raster by value")
 
 ```
 
+
+This zone of high soil moisture is considered as the potentials climate refugias and will be used for the resistence prescription.
+
 ## III.b) Creation of the buffer zone
+
+A buffer of 300 m, corresponding to a width of 2 cells, is created. Similarly to before, all cells in it are set to 12 and the others eraised.
 
 ```{r buf}
 Buf = buffer(SoilMoist, width=300)
-
-freq(Buf, merge=T) %>% as.data.frame()
 
 values(Buf)[values(Buf) == 1] = 12
 
@@ -232,16 +254,23 @@ Buf = raster(vals=getValues(Buf),
                     nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
                     xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
 
-freq(Buf, merge=T) %>% as.data.frame()
+plot(Buf, main = "Figure 8: Buffer zone around the resistence management area")
 
-plot(Buf)
+freq(Buf, merge=T) %>% as.data.frame() %>% kable(caption = "Number of cells in the buffer raster by value")
 
 ```
 
+## III.c) Creation of the buffer zone
 
-```{r}
+The potential climate refugia raster and the buffer zone raster are both merge
 
-New_Ma = cover(SoilMoist, Buf, Ownership_OnlyCA)
+```{r merge}
+
+Resistence = cover(SoilMoist, Buf)
+
+plot(Resistence)
+
+New_Ma = cover(Resistence, Ownership_OnlyCA)
 
 plot(New_Ma)
 
@@ -260,7 +289,7 @@ StandRefugia = Stands_OnlyCA + SoilMoist + Buf
 plot(StandRefugia)
 
 writeRaster(StandRefugia,
-filename =  paste0(wd,"Study_site/Stand_CA_Refugias.tif"),
+filename =  paste0(wd,"/Study_site/Stand_CA_Refugias.tif"),
 format = "GTiff", datatype ="INT4S",overwrite=T)
 
 ```
@@ -305,7 +334,7 @@ for(i in c(1:Ndup)){
 MA_Refugia = Stack$New_Ma
 
 writeRaster(MA_Refugia,
-filename =  paste0(wd,"Study_site/Ownership_CA_Refugias.tif"),
+filename =  paste0(wd,"/Study_site/Ownership_CA_Refugias.tif"),
 format = "GTiff", datatype ="INT1U",overwrite=T)
 ```
 
