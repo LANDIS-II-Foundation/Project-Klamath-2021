@@ -26,6 +26,20 @@ library(knitr)
 
 ```
 
+Used palettes for the ploting :
+
+```{r pal}
+pal.2 = colorRampPalette(c("purple","yellow"))
+pal.2.op = colorRampPalette(c("yellow","purple"))
+pal.11 = colorRampPalette(c("white", "grey", "purple","grey","tomato","green4",
+                            "green","yellow","red","grey","grey"))
+pal.13 = colorRampPalette(c("white", "grey", "purple","grey","tomato","green4",
+                            "green","yellow","red","grey","grey", "cyan","blue"))
+pal.R = colorRampPalette(c("white", "grey", "grey","grey","grey","grey","grey",
+                           "grey","grey","grey","grey", "cyan","blue"))
+
+```
+
 
 3 rasters are imported :
 
@@ -43,7 +57,6 @@ Ownership_TotKlamath =
 
 Stands_TotKlamath = 
   paste0(wd,"/Study_site/E4_stands_BAU_v5.tif") %>% raster()
-
 
 ```
 
@@ -65,8 +78,8 @@ Study_site = ER_OnlyCA_poly %>% st_as_sf %>%
 
 par(mfrow = c(1,2))
 plot(Study_site, main = "Figure 1: Borders of the study area")
-plot(ER_OnlyCA, main = "Figure 2: Reference Layer")
-
+plot(ER_OnlyCA, main = "Figure 2: Reference Layer",
+     col = pal.2(250))
 
 ```
 
@@ -80,11 +93,14 @@ Ownership_OnlyCA_select = mask(Ownership_TotKlamath, Study_site)
 Stands_OnlyCA_select = mask(Stands_TotKlamath, Study_site)
 
 par(mfrow=c(2,2))
-plot(Ownership_TotKlamath, main = "Figure 3.a: Ownership layer", xaxt="n", yaxt="n")
-plot(Ownership_OnlyCA_select, main = "Figure 3.b: Ownership in study area", xaxt="n",
-     yaxt="n")
-plot(Stands_TotKlamath, main = "Figure 3.c: Stands layer", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA_select, main = "Figure 3.d: Stands in study area", xaxt="n", yaxt="n")
+plot(Ownership_TotKlamath, main = "Figure 3.a: Ownership layer",
+     xaxt="n", yaxt="n", col = pal.2(10))
+plot(Ownership_OnlyCA_select, main = "Figure 3.b: Ownership in study area",
+     xaxt="n", yaxt="n", col = pal.2(10))
+plot(Stands_TotKlamath, main = "Figure 3.c: Stands layer",
+     xaxt="n", yaxt="n", col = pal.2(500))
+plot(Stands_OnlyCA_select, main = "Figure 3.d: Stands in study area",
+     xaxt="n", yaxt="n", col = pal.2(500))
 
 ```
 
@@ -98,11 +114,14 @@ Ownership_OnlyCA_Crop = crop(Ownership_OnlyCA_select,ER_OnlyCA)
 Stands_OnlyCA_Crop = crop(Stands_OnlyCA_select,ER_OnlyCA)
 
 par(mfrow=c(2,2))
-plot(Ownership_OnlyCA_select, main = "Figure 4.a: Ownership in study area", xaxt="n",
-     yaxt="n")
-plot(Ownership_OnlyCA_Crop, main = "Figure 4.b: Ownership croped", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA_select, main = "Figure 4.c: Stands in study area", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA_Crop, main = "Figure 4.d: Stands croped", xaxt="n", yaxt="n")
+plot(Ownership_OnlyCA_select, main = "Figure 4.a: Ownership in study area",
+     xaxt="n", yaxt="n", col = pal.2(10))
+plot(Ownership_OnlyCA_Crop, main = "Figure 4.b: Ownership croped",
+     xaxt="n", yaxt="n", col = pal.2(10))
+plot(Stands_OnlyCA_select, main = "Figure 4.c: Stands in study area",
+     xaxt="n", yaxt="n", col = pal.2(500))
+plot(Stands_OnlyCA_Crop, main = "Figure 4.d: Stands croped",
+     xaxt="n", yaxt="n", col = pal.2(500))
 
 ```
 
@@ -130,10 +149,14 @@ Ownership_OnlyCA = resample(Ownership_OnlyCA_Crop, ER_OnlyCA, method="ngb")
 Stands_OnlyCA = resample(Stands_OnlyCA_Crop, ER_OnlyCA, method="ngb")
 
 par(mfrow=c(2,2))
-plot(Ownership_OnlyCA_Crop, main = "Figure 5.a: Ownership croped", xaxt="n", yaxt="n")
-plot(Ownership_OnlyCA, main = "Figure 5.b: Ownership resampled", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA_Crop, main = "Figure 5.c: Stands croped", xaxt="n", yaxt="n")
-plot(Stands_OnlyCA, main = "Figure 5.d: Stands resampled", xaxt="n", yaxt="n")
+plot(Ownership_OnlyCA_Crop, main = "Figure 5.a: Ownership croped",
+     xaxt="n", yaxt="n", col = pal.2(10))
+plot(Ownership_OnlyCA, main = "Figure 5.b: Ownership resampled",
+     xaxt="n", yaxt="n", col = pal.2(10))
+plot(Stands_OnlyCA_Crop, main = "Figure 5.c: Stands croped",
+     xaxt="n", yaxt="n", col = pal.2(500))
+plot(Stands_OnlyCA, main = "Figure 5.d: Stands resampled",
+     xaxt="n", yaxt="n", col = pal.2(500))
 
 ```
 
@@ -204,7 +227,7 @@ The proxy used to identify these zones are the soil moisture. This choice is jus
 ```{r sm}
 SoilMoist = paste0(wd, "/Study_site/Annual-water-budget-1.img") %>% raster()
 
-plot(SoilMoist, main = "Figure 6: Soil moisture in the study site")
+plot(SoilMoist, main = "Figure 6: Soil moisture in the study site",  col = pal.2(300))
 
 ```
 
@@ -230,7 +253,8 @@ SoilMoist = raster(vals=getValues(SoilMoist),
                     nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
                     xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
 
-plot(SoilMoist, main = "Figure 7: Zones with high soil moisture")
+plot(SoilMoist, main = "Figure 7: Zones with high soil moisture",
+     legend = F, col = pal.2(1))
 
 freq(SoilMoist, merge=T) %>% as.data.frame() %>% kable(caption = "Number of cells in the potential refugias raster by value")
 
@@ -252,7 +276,8 @@ Buf = raster(vals=getValues(Buf),
                     nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
                     xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
 
-plot(Buf, main = "Figure 8: Buffer zone around the resistence management area")
+plot(Buf, main = "Figure 8: Buffer zone around the resistence management area",
+     legend = F, col = pal.2(1))
 
 freq(Buf, merge=T) %>% as.data.frame() %>% kable(caption = "Number of cells in the buffer raster by value")
 
@@ -266,7 +291,8 @@ The potential climate refugia raster and the buffer zone raster are merged.
 
 Resistence = cover(SoilMoist, Buf)
 
-plot(Resistence, main = "Figure 9: Buffer zone and management ")
+plot(Resistence, main = "Figure 9: Buffer zone and resistence area ",
+     legend = F, col = pal.2.op(2))
 
 ```
 
@@ -283,7 +309,7 @@ New_Ma = cover(Resistence, Ownership_OnlyCA)
 
 To obtain new codes for the cells situated on the resistence and buffer zones, a sum is performed.
 
-This way, the cells in question have a code that is no longer the old one and that is different depending of it is in the resistent area or the buffer zone.
+This way, the cells in question have new code that is different depending of if it is in the resistent area or the buffer zone.
 
 This new layer is then exported.
 
@@ -295,14 +321,17 @@ Buf[is.na(Buf)] = 0
 
 StandRefugia = Stands_OnlyCA + SoilMoist + Buf
 
-plot(StandRefugia)
-
 writeRaster(StandRefugia,
 filename =  paste0(wd,"/Study_site/Stand_CA_Refugias.tif"),
 format = "GTiff", datatype ="INT4S",overwrite=T)
 
 ```
 
+### III.d.2) Dealing with stands on several management areas
+
+The change on the stands operated before result on many stands being on different management areas. As this makes little sence on a practical point of view and is forbidden on LANDIS-II, the limits of the management areas are modified to make sure one stand is included in only one management area.
+
+In practice, there is no stands that where on more than two management areas, so the following script only deal with stands on two management areas, one of them being the buffer zone or the resistence area.
 
 ```{r verif}
 
@@ -310,36 +339,48 @@ format = "GTiff", datatype ="INT4S",overwrite=T)
 names(New_Ma) = "New_Ma"
 names(StandRefugia) = "StandRefugia"
 
-### Stacking lets us see where they overlap
+# The management area raster and the stands one are stacked
+# to better see where they overlap :
 Stack = stack(New_Ma,StandRefugia)
-
-### This will show where all the duplicates exist. 
 Stack_df = as.data.frame(Stack)
+
 Val = unique(Stack_df[ , 1:2 ])
 
 Ndup = sum(duplicated(Val[,2]))
 
-Dupl = subset(Val, duplicated(Val[,2]))
+Dupl = subset(Val, duplicated(Val[,2])) # list of the ID of the duplicated stands
+# (that are on 2 management areas)
 
 for(i in c(1:Ndup)){
-  DupStand = Dupl[i,2]
+  DupStand = Dupl[i,2] 
   DupMA = Stack$New_Ma[Stack$StandRefugia==DupStand] %>% unique()
+  
+  # If the 1st management area where the duplicate stand is
+  # is the buffer zone or the resistence area,
+  # then this is the management area kept :
   
   if(DupMA[1] %in% c(11,12)) {
     Select_Ma = DupMA[1]
     No_Ma = DupMA[2]
-    
+  # if not, the 2nd is kept :
   }else{
     Select_Ma = DupMA[2]
     No_Ma = DupMA[1]}
   
+  # All the cells of the management area raster that are included in the duplicaded stand
+  # are given the value of the keps management area.
   Stack$New_Ma[Stack$StandRefugia==DupStand &Stack$New_Ma==No_Ma] = Select_Ma
 }
 
+```
 
-### And write the new management file
-### This can be done in reverse, to change stands to a given managment. 
+This way, the management areas are change to make all the problematic stands placed in the buffer zone or in the resistence area. The reverse operation, change the stands to fit them on a given management area could have been done.
 
+### III.2.3) Export the new management area layer
+
+Finally, this layer is exported and will be used on the Pro-active scenario along with the corresponding stand layer.
+
+```{r exp2}
 MA_Refugia = Stack$New_Ma
 
 writeRaster(MA_Refugia,
@@ -347,27 +388,25 @@ filename =  paste0(wd,"/Study_site/Ownership_CA_Refugias.tif"),
 format = "GTiff", datatype ="INT1U",overwrite=T)
 ```
 
+
 # VI. Plot of the Management areas
+
+A summary of the different raster layers of management areas is given here.
 
 ```{r MA}
 
-pal.11 = colorRampPalette(c("white", "grey", "purple","grey","tomato","green4","green","yellow","red","grey","grey"))
-
-pal.13 = colorRampPalette(c("white", "grey", "purple","grey","tomato","green4","green","yellow","red","grey","grey", "cyan","blue"))
-
-pal.R = colorRampPalette(c("white", "grey", "grey","grey","grey","grey","grey","grey","grey","grey","grey", "cyan","blue"))
-
-par(mfrow=c(2,2))
-plot(Ownership_OnlyCA, main="Managment areas (BAU and Adaptability)",
-     col=pal.11(11))
-plot(MA_Refugia, main="Managment areas (Pro-Active)",
-     col=pal.13(13))
-plot(MA_Refugia, main="Resistence areas",
-     col=pal.R(13))
-
-data.frame("Management area" =c("Unmanaged","Federal","Unmanaged","Tribal Area","PIF", "PNIF",
+data.frame("Map_code" =c("1","2","3","4","5","6","7","8","9","10"),
+           "Management_area" =c("Unmanaged","Federal","Unmanaged","Tribal Area","PIF", "PNIF",
                                 "Matrix timberlands", "AMA","Unmanaged","Unmanaged")) %>%
   kable(caption = "Management areas map code")
+
+plot(Ownership_OnlyCA, main="Figure 10: Managment areas (BAU and Adaptability)",
+     col=pal.11(11))
+plot(MA_Refugia, main="Figure 11: Managment areas (Pro-Active)",
+     col=pal.13(13))
+plot(MA_Refugia, main="Figure 12: Resistence area and buffer zone",
+     col=pal.R(13))
+
 
 ```
 
