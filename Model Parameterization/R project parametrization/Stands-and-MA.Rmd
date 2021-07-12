@@ -58,6 +58,7 @@ Ownership_TotKlamath =
 Stands_TotKlamath = 
   paste0(wd,"/Study_site/E4_stands_BAU_v5.tif") %>% raster()
 
+
 ```
 
 We want that the management area and stands rasters have the same extent and defintion than the ecoregion one. This will allow all rasters to have the same definition and allow LANDIS-II to compute the landscape properly.
