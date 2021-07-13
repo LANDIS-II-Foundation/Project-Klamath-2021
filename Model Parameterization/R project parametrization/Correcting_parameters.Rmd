@@ -7,8 +7,15 @@ output:
     df_print: paged
 ---
 
+# I. Introduction
+
+## I.a) Set up
+
 ```{r pkg, message=F, warning=F}
-setwd("C:/Users/181248/Documents/181248/LANDIS II/R_calculus")
+wd = "D:/Internship 3A/GitHub/Project-Klamath-2021/Model Parameterization"
+files_dir = "C:/Users/Vincent/Google Drive/Internship USA_France/Data saving/Results single cell/CC single cell/"
+
+setwd(wd)
 library(magrittr)
 library(cowplot)
 library(ggplot2)
@@ -16,14 +23,21 @@ library(raster)
 library(knitr)
 ```
 
+## I.b) Presentation
+
+When looking at the results after a first run of the scenario with only the climate change (CC only), it was observed that the ecosystem was starved in nitrogen. The more likely explanation is a too important stock of nitrogen in one (or several) of the soils pools of carbon and nitrogen.
+
+These pools simulates the different soil stocks of nitrogen and carbon that interveine in the biochemical cycles. As decay progresses, carbon and nitrogen are transferred to and among the fast, slow, and passive soil organic matter (SOM) pools, with some loss to the atmosphere and through leaching. The picture below is a schematic diagram of NECN functionning, based on the CENTURY modelling. 
+
+The process described concern only the bottom panel, showing the 3 pools *SOM1*, *SOM2* and *SOM3*. NECN allows to parameter a forth pool, simulating the soil litter.
+
+![Capture of figure NECN publication](C:/Users/Vincent/Google Drive/Internship USA_France/Data saving/Results single cell/SOM.png)
+
+Thus, it was decided to change the decay rate of these pools. To do so and not spend too many time  on computing, these tests where done using the single cell landscape. The method used to build this test landscape is detailed on the pdf document "Test_Landscape".
 
 # I. NECN
 
-When looking at the results after a first run of the scenario with only the climate change (CC only), it was observed that the plants where starved in nitrogen. The explanations was a too important stock of nitrogen on one (or several) of the soils pools of carbon and nitrogen.
 
-
-It was then decided to change the decay rate of these pools. To do so and not spend too many time 
-on computing, these tests where done using the single cell landscape.
 
 The following table will recap the settings.
 
@@ -43,8 +57,6 @@ kable(data.frame("V1" = c(0.82, 0.53, 0.02, 0.0003),
 The carbon and nitrogen dynamics are plotted for the differents vertions of the *NECN.txt* file.
 
 ```{r cn1}
-
-files_dir = "C:/Users/181248/Documents/181248/LANDIS II/Results/CC single cell/"
 
 NECN_V1_long = paste(files_dir,"NECN_V1.csv",sep="") %>% read.csv()
 
@@ -140,9 +152,7 @@ plot_grid(SOMTp, CDWp, MNp, TNp, SNp, N1p, N2p, labels="AUTO", ncol = 2, nrow = 
 
 ```
 
-R.M. Scheller et al. / Ecological Modelling 222 (2011) 144–153
 
-![Capture of figure NECN publication](C:/Users/181248/Documents/181248/LANDIS II/R_calculus/Capture.png)
 
 
 ```{r SOM1}
