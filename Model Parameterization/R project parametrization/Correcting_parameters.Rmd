@@ -155,10 +155,13 @@ plot_grid(SOMTp, CDWp, MNp, TNp, SNp, N1p, N2p, labels="AUTO", ncol = 2, nrow = 
 
 ```
 
+V4 is choosen
 
 # III. Initial quantity of soil nitrogen
 
 ## III.a) Modification of initial nitrogen cocentration for a single cell raster
+
+It is observed 
 
 ```{r SOM1}
 
