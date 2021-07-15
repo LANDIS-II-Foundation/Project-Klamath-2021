@@ -13,7 +13,7 @@ output:
 
 ```{r pkg, message=F, warning=F}
 wd = "D:/Internship 3A/GitHub/Project-Klamath-2021/Model Parameterization"
-files_dir = "C:/Users/Vincent/Google Drive/Internship USA_France/Data saving/Results single cell/CC single cell/"
+files_dir = "E:/FIF/Stage 3A/Results single cell/CC single cell/"
 
 setwd(wd)
 library(magrittr)
@@ -31,15 +31,15 @@ These pools simulates the different soil stocks of nitrogen and carbon that inte
 
 The process described concern only the bottom panel, showing the 3 pools *SOM1*, *SOM2* and *SOM3*. NECN allows to parameter a forth pool, simulating the soil litter.
 
-![Capture of figure NECN publication](C:/Users/Vincent/Google Drive/Internship USA_France/Data saving/Results single cell/SOM.png)
+![Capture of figure NECN publication](E:/FIF/Stage 3A/Results single cell/SOM.png)
 
-Thus, it was decided to change the decay rate of these pools. To do so and not spend too many time  on computing, these tests where done using the single cell landscape. The method used to build this test landscape is detailed on the pdf document "Test_Landscape".
-
-# I. NECN
+Thus, it was decided to change the decay rate of these pools. To do so and not spend too many time on computing, these tests where done using the single cell landscape. The method used to build this test landscape is detailed on the pdf document "Test_Landscape".
 
 
+# I.c) Scenario
 
-The following table will recap the settings.
+The scenario used to test the parameters correspond to a single cell landscape with only climate change i.e. without disturbancies (insect breakout, fire or harvest).
+A summary of the settings used in the different subscenarios of the signle cell run are presented on the following table. They correspond to the decay rate of the four soil layers.
 
 ```{r table}
 kable(data.frame("V1" = c(0.82, 0.53, 0.02, 0.0003),
@@ -49,52 +49,61 @@ kable(data.frame("V1" = c(0.82, 0.53, 0.02, 0.0003),
                  "V5" = c(0.99, 0.99, 0.04, 0.0003),
            row.names = c("DecayRateSurf","DecayRateSOM1",
                          "DecayRateSOM2", "DecayRateSOM3")),
-      caption = "Decay rates used in the vertions")
+      caption = "Decay rates used in the sub-scenarios")
 
 ```
 
+# II. Carbon and nitrogen dynamics
 
-The carbon and nitrogen dynamics are plotted for the differents vertions of the *NECN.txt* file.
+The succetion log files of the NECN extention are imported for all the sub-scenarios. Only the variables of interest are selected.
+
 
 ```{r cn1}
 
-NECN_V1_long = paste(files_dir,"NECN_V1.csv",sep="") %>% read.csv()
+NECN_V1_long = paste0(files_dir,"NECN_V1.csv") %>% read.csv()
 
-NECN_V1 = aggregate(data=NECN_V1_long, cbind(NEEC, SOMTC, AGB, AG_NPPC, BG_NPPC, Litterfall, AgeMortality, MineralN, TotalN, GrossMineralization, C_LiveLeaf, C_LiveFRoot, C_LiveWood, C_DeadWood, C_DeadCRoot, C_DeadLeaf_Struc, C_DeadLeaf_Meta, C_DeadFRoot_Struc, C_DeadFRoot_Meta, C_SOM1surf, C_SOM1soil, C_SOM2, C_SOM3, N_Leaf, N_FRoot, N_Wood, N_CRoot, N_DeadWood, N_DeadCRoot, N_DeadLeaf_Struc, N_DeadLeaf_Meta, N_DeadFRoot_Struc, N_DeadFRoot_Meta, N_SOM1surf, N_SOM1soil, N_SOM2, N_SOM3, SurfStrucNetMin, SurfMetaNetMin, SoilStrucNetMin, SoilMetaNetMin, SOM1surfNetMin, SOM1soilNetMin, SOM2NetMin, SOM3NetMin, TotalNdep, LeachedC, LeachedN, FireCEfflux, FireNEfflux, Nuptake, Nresorbed, TotalSoilN, Nvol, FrassC) ~ Time, mean)
-
+NECN_V1 = aggregate(data=NECN_V1_long, cbind(SOMTC, MineralN, TotalN, C_DeadWood,
+                                             N_SOM1surf, N_SOM1soil, N_SOM2) ~ Time, mean)
 NECN_V1$Vertion = "v1"
 
 
-NECN_V2_long = paste(files_dir,"NECN_V2.csv",sep="") %>% read.csv()
+NECN_V2_long = paste0(files_dir,"NECN_V2.csv") %>% read.csv()
 
-NECN_V2 = aggregate(data=NECN_V2_long, cbind(NEEC, SOMTC, AGB, AG_NPPC, BG_NPPC, Litterfall, AgeMortality, MineralN, TotalN, GrossMineralization, C_LiveLeaf, C_LiveFRoot, C_LiveWood, C_DeadWood, C_DeadCRoot, C_DeadLeaf_Struc, C_DeadLeaf_Meta, C_DeadFRoot_Struc, C_DeadFRoot_Meta, C_SOM1surf, C_SOM1soil, C_SOM2, C_SOM3, N_Leaf, N_FRoot, N_Wood, N_CRoot, N_DeadWood, N_DeadCRoot, N_DeadLeaf_Struc, N_DeadLeaf_Meta, N_DeadFRoot_Struc, N_DeadFRoot_Meta, N_SOM1surf, N_SOM1soil, N_SOM2, N_SOM3, SurfStrucNetMin, SurfMetaNetMin, SoilStrucNetMin, SoilMetaNetMin, SOM1surfNetMin, SOM1soilNetMin, SOM2NetMin, SOM3NetMin, TotalNdep, LeachedC, LeachedN, FireCEfflux, FireNEfflux, Nuptake, Nresorbed, TotalSoilN, Nvol, FrassC) ~ Time, mean)
-
+NECN_V2 = aggregate(data=NECN_V2_long, cbind(SOMTC, MineralN, TotalN, C_DeadWood,
+                                             N_SOM1surf, N_SOM1soil, N_SOM2) ~ Time, mean)
 NECN_V2$Vertion = "v2"
 
 
-NECN_V3_long = paste(files_dir,"NECN_V3.csv",sep="") %>% read.csv()
+NECN_V3_long = paste0(files_dir,"NECN_V3.csv") %>% read.csv()
 
-NECN_V3 = aggregate(data=NECN_V3_long, cbind(NEEC, SOMTC, AGB, AG_NPPC, BG_NPPC, Litterfall, AgeMortality, MineralN, TotalN, GrossMineralization, C_LiveLeaf, C_LiveFRoot, C_LiveWood, C_DeadWood, C_DeadCRoot, C_DeadLeaf_Struc, C_DeadLeaf_Meta, C_DeadFRoot_Struc, C_DeadFRoot_Meta, C_SOM1surf, C_SOM1soil, C_SOM2, C_SOM3, N_Leaf, N_FRoot, N_Wood, N_CRoot, N_DeadWood, N_DeadCRoot, N_DeadLeaf_Struc, N_DeadLeaf_Meta, N_DeadFRoot_Struc, N_DeadFRoot_Meta, N_SOM1surf, N_SOM1soil, N_SOM2, N_SOM3, SurfStrucNetMin, SurfMetaNetMin, SoilStrucNetMin, SoilMetaNetMin, SOM1surfNetMin, SOM1soilNetMin, SOM2NetMin, SOM3NetMin, TotalNdep, LeachedC, LeachedN, FireCEfflux, FireNEfflux, Nuptake, Nresorbed, TotalSoilN, Nvol, FrassC) ~ Time, mean)
-
+NECN_V3 = aggregate(data=NECN_V3_long, cbind(SOMTC, MineralN, TotalN, C_DeadWood,
+                                             N_SOM1surf, N_SOM1soil, N_SOM2) ~ Time, mean)
 NECN_V3$Vertion = "v3"
 
-NECN_V4_long = read.csv("C:/Users/181248/Documents/181248/LANDIS II/Results/CC_only_single_cell/NECN-succession-log.csv")
 
-NECN_V4 = aggregate(data=NECN_V4_long, cbind(NEEC, SOMTC, AGB, AG_NPPC, BG_NPPC, Litterfall, AgeMortality, MineralN, TotalN, GrossMineralization, C_LiveLeaf, C_LiveFRoot, C_LiveWood, C_DeadWood, C_DeadCRoot, C_DeadLeaf_Struc, C_DeadLeaf_Meta, C_DeadFRoot_Struc, C_DeadFRoot_Meta, C_SOM1surf, C_SOM1soil, C_SOM2, C_SOM3, N_Leaf, N_FRoot, N_Wood, N_CRoot, N_DeadWood, N_DeadCRoot, N_DeadLeaf_Struc, N_DeadLeaf_Meta, N_DeadFRoot_Struc, N_DeadFRoot_Meta, N_SOM1surf, N_SOM1soil, N_SOM2, N_SOM3, SurfStrucNetMin, SurfMetaNetMin, SoilStrucNetMin, SoilMetaNetMin, SOM1surfNetMin, SOM1soilNetMin, SOM2NetMin, SOM3NetMin, TotalNdep, LeachedC, LeachedN, FireCEfflux, FireNEfflux, Nuptake, Nresorbed, TotalSoilN, Nvol, FrassC) ~ Time, mean)
+NECN_V4_long = paste0(files_dir,"NECN_V4.csv") %>% read.csv()
 
+NECN_V4 = aggregate(data=NECN_V4_long, cbind(SOMTC, MineralN, TotalN, C_DeadWood,
+                                             N_SOM1surf, N_SOM1soil, N_SOM2) ~ Time, mean)
 NECN_V4$Vertion = "v4"
 
-NECN_V5_long = paste(files_dir,"NECN_V5.csv",sep="") %>% read.csv()
 
-NECN_V5 = aggregate(data=NECN_V5_long, cbind(NEEC, SOMTC, AGB, AG_NPPC, BG_NPPC, Litterfall, AgeMortality, MineralN, TotalN, GrossMineralization, C_LiveLeaf, C_LiveFRoot, C_LiveWood, C_DeadWood, C_DeadCRoot, C_DeadLeaf_Struc, C_DeadLeaf_Meta, C_DeadFRoot_Struc, C_DeadFRoot_Meta, C_SOM1surf, C_SOM1soil, C_SOM2, C_SOM3, N_Leaf, N_FRoot, N_Wood, N_CRoot, N_DeadWood, N_DeadCRoot, N_DeadLeaf_Struc, N_DeadLeaf_Meta, N_DeadFRoot_Struc, N_DeadFRoot_Meta, N_SOM1surf, N_SOM1soil, N_SOM2, N_SOM3, SurfStrucNetMin, SurfMetaNetMin, SoilStrucNetMin, SoilMetaNetMin, SOM1surfNetMin, SOM1soilNetMin, SOM2NetMin, SOM3NetMin, TotalNdep, LeachedC, LeachedN, FireCEfflux, FireNEfflux, Nuptake, Nresorbed, TotalSoilN, Nvol, FrassC) ~ Time, mean)
+NECN_V5_long = paste0(files_dir,"NECN_V5.csv") %>% read.csv()
 
+NECN_V5 = aggregate(data=NECN_V5_long, cbind(SOMTC, MineralN, TotalN, C_DeadWood,
+                                             N_SOM1surf, N_SOM1soil, N_SOM2) ~ Time, mean)
 NECN_V5$Vertion = "v5"
 
-NECN = rbind(NECN_V1, NECN_V2, NECN_V3, NECN_V4,NECN_V5)
 
+NECN = rbind(NECN_V1, NECN_V2, NECN_V3, NECN_V4, NECN_V5)
+
+```
+
+The carbon and nitrogen dynamics are then plotted against time for all the sub-scenario.
+
+```{r plots}
 SOMTp = ggplot(NECN, aes(x=Time, y=SOMTC, col=Vertion, shape = Vertion)) +
   geom_point() +
-  #geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
   scale_x_continuous(name= "Time (in years)") +
   scale_y_continuous(name = "SOMTC") +
   ggtitle("Evolution of the soil organic mater") +
@@ -102,7 +111,6 @@ SOMTp = ggplot(NECN, aes(x=Time, y=SOMTC, col=Vertion, shape = Vertion)) +
 
 CDWp = ggplot(NECN, aes(x=Time, y=C_DeadWood, col=Vertion, shape = Vertion)) +
   geom_point() +
-  #geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
   scale_x_continuous(name= "Time (in years)") +
   scale_y_continuous(name = "") +
   ggtitle("Evolution of the dead wood carbon") +
@@ -110,7 +118,6 @@ CDWp = ggplot(NECN, aes(x=Time, y=C_DeadWood, col=Vertion, shape = Vertion)) +
 
 MNp = ggplot(NECN, aes(x=Time, y=MineralN, col=Vertion, shape = Vertion)) +
   geom_point() +
-  #geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
   scale_x_continuous(name= "Time (in years)") +
   scale_y_continuous(name = "") +
   ggtitle("Evolution of the mineral nitrogen") +
@@ -118,7 +125,6 @@ MNp = ggplot(NECN, aes(x=Time, y=MineralN, col=Vertion, shape = Vertion)) +
 
 TNp =  ggplot(NECN, aes(x=Time, y=TotalN, col=Vertion, shape = Vertion)) +
   geom_point() +
-  #geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
   scale_x_continuous(name= "Time (in years)") +
   scale_y_continuous(name = "") +
   ggtitle("Evolution of the total nitrogen") +
@@ -126,7 +132,6 @@ TNp =  ggplot(NECN, aes(x=Time, y=TotalN, col=Vertion, shape = Vertion)) +
 
 SNp =  ggplot(NECN, aes(x=Time, y=N_SOM1surf, col=Vertion, shape = Vertion)) +
   geom_point() +
-  #geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
   scale_x_continuous(name= "Time (in years)") +
   scale_y_continuous(name = "") +
   ggtitle("Evolution of the surface nitrogen") +
@@ -134,7 +139,6 @@ SNp =  ggplot(NECN, aes(x=Time, y=N_SOM1surf, col=Vertion, shape = Vertion)) +
 
 N1p =  ggplot(NECN, aes(x=Time, y=N_SOM1soil, col=Vertion, shape = Vertion)) +
   geom_point() +
-  #geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
   scale_x_continuous(name= "Time (in years)") +
   scale_y_continuous(name = "") +
   ggtitle("Evolution of the SOM1 soil nitrogen") +
@@ -142,7 +146,6 @@ N1p =  ggplot(NECN, aes(x=Time, y=N_SOM1soil, col=Vertion, shape = Vertion)) +
 
 N2p =  ggplot(NECN, aes(x=Time, y=N_SOM2, col=Vertion, shape = Vertion)) +
   geom_point() +
-  #geom_smooth(method=lm, se=FALSE, fullrange=TRUE)+
   scale_x_continuous(name= "Time (in years)") +
   scale_y_continuous(name = "") +
   ggtitle("Evolution of the SOM2 nitrogen") +
@@ -153,7 +156,9 @@ plot_grid(SOMTp, CDWp, MNp, TNp, SNp, N1p, N2p, labels="AUTO", ncol = 2, nrow = 
 ```
 
 
+# III. Initial quantity of soil nitrogen
 
+## III.a) Modification of initial nitrogen cocentration for a single cell raster
 
 ```{r SOM1}
 
@@ -161,14 +166,23 @@ Nsoil1 = paste(files_dir,"som1nsoil2.tif",sep="") %>% raster()
 
 Nsurf1 = paste(files_dir,"som1nsurf4.tif",sep="") %>% raster()
 
-Nsoil1@data@min
-Nsurf1@data@min
+a = freq(Nsoil1, merge=T) %>% as.data.frame()
+b = freq(Nsurf1, merge=T) %>% as.data.frame()
+
 
 Nsoil1[1] <- 20
 Nsurf1[1] <- 18
 
-Nsoil1@data@min
-Nsurf1@data@min
+c = freq(Nsoil1, merge=T) %>% as.data.frame()
+d = freq(Nsurf1, merge=T) %>% as.data.frame()
+
+rbind(a,b,c,d) %>% data.frame(row.names = c("Initial N on SOM1 soil layer","Initial N on SOM1 surface layer",
+                                 "New N on SOM1 soil layer", "New N on SOM1 surface layer")) %>%
+  kable(caption = "Initial and modified concentration of nitrogen on the SOM1 layers")
+
+```
+
+```{r exprt}
 
 writeRaster(Nsoil1, file=paste(files_dir,"som1nsoil_V1", sep=""),
                 format = "GTiff", datatype='FLT4S',overwrite=T)
@@ -178,6 +192,7 @@ writeRaster(Nsurf1, file=paste(files_dir,"som1nsurf_V1", sep=""),
 
 ```
 
+## III.b) Modification of initial nitrogen cocentration for the initial raster
 
 ```{r SOM1.2}
 
@@ -189,10 +204,10 @@ SurfMean = cellStats(Nsurf1_Tot, stat='mean', na.rm=TRUE, asSample=TRUE)
 
 par(mfrow=c(1,2))
 boxplot(Nsoil1_Tot, maxpixels=1000000, xlab = "SOM1 Soil N")
-cellStats(Nsoil1_Tot, stat='mean', na.rm=TRUE, asSample=TRUE) %>% points(,pch=4,col="red")
+cellStats(Nsoil1_Tot, stat='mean', na.rm=TRUE, asSample=TRUE) %>% points(pch=4,col="red")
 
 boxplot(Nsurf1_Tot, maxpixels=1000000, xlab = "SOM1 surface N")
-cellStats(Nsurf1_Tot, stat='mean', na.rm=TRUE, asSample=TRUE) %>% points(,pch=4,col="red")
+cellStats(Nsurf1_Tot, stat='mean', na.rm=TRUE, asSample=TRUE) %>% points(pch=4,col="red")
 
 print(paste("Mean of SOM1 soil raster:", SoilMean, "Mean of SOM1 surface raster:", SurfMean, sep=" "))
 
