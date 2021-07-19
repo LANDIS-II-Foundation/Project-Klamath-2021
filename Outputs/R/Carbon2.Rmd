@@ -14,14 +14,14 @@ Used pakages :
 
 ```{r setup, message=FALSE, warning=FALSE}
 
-setwd(
-  "D:/Users/181248/Documents/R")
+wd = "D:/Internship 3A/GitHub/Project-Klamath-2021/Outputs/R"
+
+setwd(wd)
 library(magrittr)
 library(cowplot)
 library(ggplot2)
 library(raster)
-library(animation)
-library(rasterVis)
+#library(rasterVis)
 library(knitr)
 library(tibble)
 library(dplyr)
@@ -31,20 +31,27 @@ library(dplyr)
 ```{r data}
 
 BAU_input =
-  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest BAU/"
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest BAU/"
 Adapty_input = 
-  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest Adaptability/"
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Adaptability/"
 ProAct_input =
-  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest Pro-active/"
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Pro-active/"
 
-BAU_inputBM = 
-  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest BAU/..1/biomass/"
-Adapty_inputBM = 
-  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest Adaptability/..1/biomass/"
-ProAct_inputBM =
-  "D:/Users/181248/Documents/Klamath_(CA_only)_2021 - Harvest Pro-active/..1/biomass/"
+BAU_inputBM1 = 
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest BAU/..1/biomass/"
+Adapty_inputBM1 = 
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Adaptability/..1/biomass/"
+ProAct_inputBM1 =
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Pro-active/..1/biomass/"
 
-ListScenario = c("BAU","Adapty","ProAct")
+BAU_inputBM2 = 
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest BAU/..2/biomass/"
+Adapty_inputBM2 = 
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Adaptability/..2/biomass/"
+ProAct_inputBM2 =
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Pro-active/..2/biomass/"
+
+ListScenario = c("BAU","Adapty")#,"ProAct")
 
 ```
 
@@ -71,90 +78,115 @@ The biomass killed by fires coming from lightnings (natural fire mortality), by 
 
 Mortality = data.frame()
 
-for(scenario in ListScenario){
+for(j in c(1,2)){
+  
+  if(j == 1) { run = "..1"
+  } else { run = "..2"}
+
+  for(scenario in ListScenario){
     
-  if(scenario == "BAU") {Input = BAU_input
-  } else if(scenario == "Adapty"){Input = Adapty_input
-  } else {Input = ProAct_input}
+    if(scenario == "BAU") {Input = BAU_input
+    } else if(scenario == "Adapty"){Input = Adapty_input
+    } else {Input = ProAct_input}
 
-  BDA_Tot = paste(Input,"..1/bda_log.csv",sep="") %>% read.csv()
-  BDA = cbind(BDA_Tot$Time, BDA_Tot$TotalBiomassMortality) %>% as.data.frame()
-  colnames(BDA) = c("Time", "Mortality")
+    BDA_Tot = paste(Input, run, "/bda_log.csv",sep="") %>% read.csv()
+    BDA = cbind(BDA_Tot$Time, BDA_Tot$TotalBiomassMortality) %>% as.data.frame()
+    colnames(BDA) = c("Time", "Mortality")
 
-  BDA = aggregate(BDA$Mortality, by=list(Time=BDA$Time), FUN=sum)
+    BDA = aggregate(BDA$Mortality, by=list(Time=BDA$Time), FUN=sum)
 
-  colnames(BDA) = c("Time", "Mortality")
+    colnames(BDA) = c("Time", "Mortality")
 
 
-  for(i in (1:100)){
-    if(!(i %in% BDA$Time)){
-    BDA = rbind(BDA, c(i,0))
+    for(i in (1:100)){
+      if(!(i %in% BDA$Time)){
+      BDA = rbind(BDA, c(i,0))
+      }
     }
+
+    BDA$Disturbancy = "Insects"
+    BDA$Scenario = scenario
+    BDA$Run = j
+
+    scrapple_Tot = paste(Input, run, "/scrapple-summary-log.csv", sep="") %>% read.csv()
+    scrapple_Acc = cbind(scrapple_Tot$SimulationYear,
+                    scrapple_Tot$TotalBiomassMortalityAccidental) %>% as.data.frame()
+    colnames(scrapple_Acc) = c("Time", "Mortality")
+    scrapple_Acc$Disturbancy = "Fire accidental"
+    scrapple_Acc$Scenario = scenario
+    scrapple_Acc$Run = j
+
+    scrapple_Nat = cbind(scrapple_Tot$SimulationYear,
+                    scrapple_Tot$TotalBiomassMortalityLightning) %>% as.data.frame()
+    colnames(scrapple_Nat) = c("Time", "Mortality")
+    scrapple_Nat$Disturbancy = "Fire lightning"
+    scrapple_Nat$Scenario = scenario
+    scrapple_Nat$Run = j
+  
+    Harvest_Tot =  paste(Input, run, "/harvest/summary-log.csv",sep="") %>% read.csv()
+    Harvest = Harvest_Tot %>% group_by(Time) %>%
+      summarise(TotalBiomassHarvested = sum(TotalBiomassHarvested))
+    colnames(Harvest) = c("Time", "Mortality")
+    Harvest$Mortality = Harvest$Mortality %>% as.numeric()
+    Harvest$Mortality = Harvest$Mortality*100 # convertion Mg/ha in g/m²
+    Harvest$Disturbancy = "Harvest"
+    Harvest$Scenario = scenario
+    Harvest$Run = j
+  
+    Mortality = rbind(Mortality, BDA, scrapple_Acc, scrapple_Nat, Harvest)
   }
-
-  BDA$Disturbancy = "Insects"
-  BDA$Scenario = scenario
-
-  scrapple_Tot = paste(Input, "..1/scrapple-summary-log.csv", sep="") %>% read.csv()
-  scrapple_Acc = cbind(scrapple_Tot$SimulationYear,
-                  scrapple_Tot$TotalBiomassMortalityAccidental) %>% as.data.frame()
-  colnames(scrapple_Acc) = c("Time", "Mortality")
-  scrapple_Acc$Disturbancy = "Fire accidental"
-  scrapple_Acc$Scenario = scenario
-
-  scrapple_Nat = cbind(scrapple_Tot$SimulationYear,
-                  scrapple_Tot$TotalBiomassMortalityLightning) %>% as.data.frame()
-  colnames(scrapple_Nat) = c("Time", "Mortality")
-  scrapple_Nat$Disturbancy = "Fire lightning"
-  scrapple_Nat$Scenario = scenario
-  
-  Harvest_Tot =  paste(Input,"..1/harvest-event-test-log.csv",sep="") %>% read.csv()
-  Harvest = Harvest_Tot %>% group_by(Time) %>%
-    summarise(MgBiomassRemoved = sum(MgBiomassRemoved))
-  colnames(Harvest) = c("Time", "Mortality")
-  Harvest$Mortality = Harvest$Mortality %>% as.numeric()
-  Harvest$Mortality = Harvest$Mortality*100 # convertion Mg/ha in g/m²
-  Harvest$Disturbancy = "Harvest"
-  Harvest$Scenario = scenario
-  
-  
-  Mortality = rbind(Mortality, BDA, scrapple_Acc, scrapple_Nat, Harvest)
 }
-
+  
 ```
 
 The biomass removed by harvest is also added as a mortality.
 
+```{r regroup}
+
+Mortality_Agg = Mortality %>% group_by(Disturbancy, Scenario) %>%
+      summarise(MortalityMean = mean(Mortality), MortalitySd = sd(Mortality))
+
+Mortality_AggT = Mortality %>% group_by(Time, Disturbancy, Scenario) %>%
+      summarise(MortalityMean = mean(Mortality), MortalitySd = sd(Mortality))
+
+```
+
+
+
 ```{r mort2, message=F, warning=F}
 
 
-ggplot(Mortality, aes(x=Time, y=Mortality, col=Disturbancy, group=Disturbancy)) +
+ggplot(Mortality_AggT, aes(x=Time, y=MortalityMean, col=Disturbancy, group=Disturbancy)) +
   geom_line()+
-#  geom_area(aes(fill=Disturbancy)) +
+  geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
   xlab("Time (years)") +
   ylab("Mortality in biomass") +
   ggtitle("Evolution of mortality due to disturbancies on different scenarios") +
   theme(plot.title = element_text(hjust = 0.5))+
   facet_wrap(~Scenario, ncol=1)
 
+```
 
-ggplot(Mortality, aes(x=Disturbancy, y=Mortality, fill = Disturbancy)) +
+```{r}
+
+ggplot(Mortality_Agg, aes(x=Disturbancy, y=MortalityMean, fill = Disturbancy)) +
   geom_bar(stat="identity") +
+  geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
   xlab("Type of disturbancy") +
   ylab("Mortality in biomass") +
   ggtitle("Total mortality by scenario") +
-  theme(plot.title = element_text(hjust = 0.5))+
+  theme(plot.title = element_text(hjust = 0.5)) +
   facet_wrap(~Scenario, ncol=3)
+
 ```
 
+## verify no adjusting
 
 
 
 Non parametric test and paired => Wilcoxon Test
 
 ```{r comp}
-
-MorTable = c("Scenario", "Disturbancy", "mean_mortality", "standard_error")
 TestData = data.frame()
 
 for (disturbance in c("Insects","Fire accidental", "Fire lightning", "Harvest")) {
@@ -162,13 +194,7 @@ for (disturbance in c("Insects","Fire accidental", "Fire lightning", "Harvest"))
     Mort = Mortality$Mortality[Mortality$Disturbancy==disturbance &
                                  Mortality$Scenario==scenario] %>%
                                   as.numeric() %>% as.data.frame()
-    MeanMort = mean(Mort$.)
-    sdMort = sd(Mort$.)
-    
-    MorTable = rbind(MorTable, c(scenario, disturbance, MeanMort, sdMort))
-    
-    names(Mort) = paste0(disturbance, "_", scenario)
-    
+    names(Mort) = paste0(disturbance,"_",scenario)
     if (nrow(TestData) == 0) {
       TestData = Mort
     } else {
@@ -176,34 +202,25 @@ for (disturbance in c("Insects","Fire accidental", "Fire lightning", "Harvest"))
     }
   }
   
+  
 }
 
-colnames(MorTable)=MorTable[1,] %>% unlist %>% as.character
-MorTable=MorTable[-1,] %>% as.data.frame()
+j=(1:8)
+TestData[ , j] = apply(TestData[ , j], 2,
+                    function(x) as.numeric(as.character(x)))
 
-
-kable(as.data.frame(MorTable), caption = "Mortality depending on the scenario")
-
-```
-
-```{r MorTable}
-
-#MorTable$mean_mortality = MorTable$mean_mortality %>% as.numeric()
-#MorTable$sd = MorTable$sd %>% as.numeric()
-
-#MorTable$mean_mortality = MorTable$mean_mortality %>% formatC(format="e", digits = 2)
-#MorTable$sd = MorTable$sd %>% formatC(format="e", digits = 2)
-
-#MorTable$Table = paste0(MorTable$mean_mortality, "(",MorTable$sd,")")
+kable(as.data.frame(Mortality_Agg), caption = "Mortality depending on the scenario")
 
 ```
+
 
 ### III.a.1) Harvest
 
 ```{r harvestplot}
 
-ggplot(Mortality[Mortality$Disturbancy=="Harvest",], aes(x=Scenario, y=Mortality, fill=Scenario)) +
+ggplot(Mortality_Agg[Mortality_Agg$Disturbancy=="Harvest",], aes(x=Scenario, y=MortalityMean, fill=Scenario)) +
 geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
 ylab("Biomass removed") +
 ggtitle("Harvest by scenario") +
 theme(plot.title = element_text(hjust = 0.5))
@@ -214,11 +231,11 @@ theme(plot.title = element_text(hjust = 0.5))
 
 shapiro.test(TestData$Harvest_BAU)
 shapiro.test(TestData$Harvest_Adapty)
-shapiro.test(TestData$Harvest_ProAct)
+#shapiro.test(TestData$Harvest_ProAct)
 
 wilcox.test(TestData$Harvest_BAU, TestData$Harvest_Adapty)
 wilcox.test(TestData$Harvest_BAU, TestData$Harvest_ProAct)
-wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+#wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
 
 ```
 
@@ -227,8 +244,9 @@ wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
 
 ```{r InsectComp}
 
-ggplot(Mortality[Mortality$Disturbancy=="Insects",], aes(x=Scenario, y=Mortality, fill=Scenario)) +
+ggplot(Mortality_Agg[Mortality_Agg$Disturbancy=="Insects",], aes(x=Scenario, y=MortalityMean, fill=Scenario)) +
 geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
 ylab("Biomass killed") +
 ggtitle("Insect outbreak by scenario") +
 theme(plot.title = element_text(hjust = 0.5))
@@ -238,24 +256,39 @@ theme(plot.title = element_text(hjust = 0.5))
 
 ```
 
+```{r insectstest}
+
+shapiro.test(TestData$Insects_BAU)
+shapiro.test(TestData$Insects_Adapty)
+#shapiro.test(TestData$Harvest_ProAct)
+
+wilcox.test(TestData$Harvest_BAU, TestData$Insects_Adapty)
+wilcox.test(TestData$Harvest_BAU, TestData$Insects_ProAct)
+#wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+
+```
+
+p-hacking
+
 
 ### III.c.3) Fire
 
-i) Accidental
+  i) Accidental
 
-  Don't consider the Rx here
+Don't consider the Rx here
 
 ```{r FireAcplot, message=F, warning=F}
 
-ggplot(Mortality[Mortality$Disturbancy=="Fire accidental",], aes(x=Scenario, y=Mortality, fill=Scenario)) +
+ggplot(Mortality_Agg[Mortality_Agg$Disturbancy=="Fire accidental",], aes(x=Scenario, y=MortalityMean, fill=Scenario)) +
 geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
 ylab("Biomass burned") +
 ggtitle("Biomass burned accidentaly by scenario") +
 theme(plot.title = element_text(hjust = 0.5))
 
 ```
 
-ii) Natural
+  ii) Natural
 
 ```{r FireNat}
 ggplot(Mortality[Mortality$Disturbancy=="Fire lightning",], aes(x=Scenario, y=Mortality, fill=Scenario)) +
@@ -266,6 +299,17 @@ theme(plot.title = element_text(hjust = 0.5))
 
 ```
 
+```{r fireacctest}
+
+shapiro.test(TestData$Fire lightning_BAU)
+shapiro.test(TestData$Fire lightning_Adapty)
+#shapiro.test(TestData$Harvest_ProAct)
+
+wilcox.test(TestData$Harvest_BAU, TestData$Fire lightning_Adapty)
+wilcox.test(TestData$Harvest_BAU, TestData$Fire lightning_ProAct)
+#wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+
+```
 
 Mean mortality, max, f pics
 
@@ -588,6 +632,15 @@ plot_grid(Tmaxp, Tminp, Pp, labels="AUTO", ncol = 1, nrow = 3)
 
 StackCovDif = stack()
 StackBM = stack()
+
+for(i in c(1,2)){
+  
+  if(i == 1) {BAU_inputBM == BAU_inputBM1 &
+    Adapty_inputBM == Adapty_inputBM1 &
+    ProAct_inputBM == ProAct_inputBM1
+  } else {BAU_inputBM == BAU_inputBM2 &
+    Adapty_inputBM == Adapty_inputBM2 &
+    ProAct_inputBM == ProAct_inputBM2}
 
 for(scenario in ListScenario){
     
