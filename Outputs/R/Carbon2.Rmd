@@ -143,11 +143,16 @@ The biomass removed by harvest is also added as a mortality.
 
 ```{r regroup}
 
-Mortality_Agg = Mortality %>% group_by(Disturbancy, Scenario) %>%
-      summarise(MortalityMean = mean(Mortality), MortalitySd = sd(Mortality))
+Mortality_Sum = Mortality %>% group_by(Disturbancy, Scenario, Run) %>%
+      summarise(MortalitySum = sum(Mortality))
+
+InvBessel = (ncol(Mortality_Sum)-1)/ncol(Mortality_Sum) %>% sqrt()
+
+Mortality_Agg = Mortality_Sum %>% group_by(Disturbancy, Scenario) %>%
+      summarise(MortalityMean = mean(MortalitySum), MortalitySd = sd(MortalitySum)*InvBessel)
 
 Mortality_AggT = Mortality %>% group_by(Time, Disturbancy, Scenario) %>%
-      summarise(MortalityMean = mean(Mortality), MortalitySd = sd(Mortality))
+      summarise(MortalityMean = mean(Mortality), MortalitySd = sd(Mortality)*InvBessel)
 
 ```
 
@@ -158,9 +163,24 @@ Mortality_AggT = Mortality %>% group_by(Time, Disturbancy, Scenario) %>%
 
 ggplot(Mortality_AggT, aes(x=Time, y=MortalityMean, col=Disturbancy, group=Disturbancy)) +
   geom_line()+
+  xlab("Time (years)") +
+  ylab("Mortality in biomass") +
+  coord_cartesian(ylim=c(-250000000, 1750000000)) +
+  ggtitle("Evolution of mortality due to disturbancies on different scenarios") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  facet_wrap(~Scenario, ncol=1)
+
+```
+
+```{r mort2, message=F, warning=F}
+
+
+ggplot(Mortality_AggT, aes(x=Time, y=MortalityMean, col=Disturbancy, group=Disturbancy)) +
+  geom_line()+
   geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
   xlab("Time (years)") +
   ylab("Mortality in biomass") +
+  coord_cartesian(ylim=c(-250000000, 1750000000)) +
   ggtitle("Evolution of mortality due to disturbancies on different scenarios") +
   theme(plot.title = element_text(hjust = 0.5))+
   facet_wrap(~Scenario, ncol=1)
@@ -291,8 +311,9 @@ theme(plot.title = element_text(hjust = 0.5))
   ii) Natural
 
 ```{r FireNat}
-ggplot(Mortality[Mortality$Disturbancy=="Fire lightning",], aes(x=Scenario, y=Mortality, fill=Scenario)) +
+ggplot(Mortality_Agg[Mortality_Agg$Disturbancy=="Fire lightning",], aes(x=Scenario, y=MortalityMean, fill=Scenario)) +
 geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
 ylab("Biomass burned") +
 ggtitle("Biomass burned naturaly by scenario") +
 theme(plot.title = element_text(hjust = 0.5))
