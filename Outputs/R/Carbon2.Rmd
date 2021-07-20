@@ -51,7 +51,7 @@ Adapty_inputBM2 =
 ProAct_inputBM2 =
   "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Pro-active/..2/biomass/"
 
-ListScenario = c("BAU","Adapty")#,"ProAct")
+ListScenario = c("BAU","Adapty","ProAct")
 
 ```
 
@@ -231,11 +231,11 @@ theme(plot.title = element_text(hjust = 0.5))
 
 shapiro.test(TestData$Harvest_BAU)
 shapiro.test(TestData$Harvest_Adapty)
-#shapiro.test(TestData$Harvest_ProAct)
+shapiro.test(TestData$Harvest_ProAct)
 
 wilcox.test(TestData$Harvest_BAU, TestData$Harvest_Adapty)
 wilcox.test(TestData$Harvest_BAU, TestData$Harvest_ProAct)
-#wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
 
 ```
 
@@ -260,11 +260,11 @@ theme(plot.title = element_text(hjust = 0.5))
 
 shapiro.test(TestData$Insects_BAU)
 shapiro.test(TestData$Insects_Adapty)
-#shapiro.test(TestData$Harvest_ProAct)
+shapiro.test(TestData$Harvest_ProAct)
 
 wilcox.test(TestData$Harvest_BAU, TestData$Insects_Adapty)
 wilcox.test(TestData$Harvest_BAU, TestData$Insects_ProAct)
-#wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
 
 ```
 
@@ -303,11 +303,11 @@ theme(plot.title = element_text(hjust = 0.5))
 
 shapiro.test(TestData$Fire lightning_BAU)
 shapiro.test(TestData$Fire lightning_Adapty)
-#shapiro.test(TestData$Harvest_ProAct)
+shapiro.test(TestData$Harvest_ProAct)
 
 wilcox.test(TestData$Harvest_BAU, TestData$Fire lightning_Adapty)
 wilcox.test(TestData$Harvest_BAU, TestData$Fire lightning_ProAct)
-#wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
 
 ```
 
