@@ -207,27 +207,6 @@ ggplot(Mortality_Agg, aes(x=Disturbancy, y=MortalityMean, fill = Disturbancy)) +
 Non parametric test and paired => Wilcoxon Test
 
 ```{r comp}
-TestData = data.frame()
-
-for (disturbance in c("Insects","Fire accidental", "Fire lightning", "Harvest")) {
-  for (scenario in ListScenario) {
-    Mort = Mortality$Mortality[Mortality$Disturbancy==disturbance &
-                                 Mortality$Scenario==scenario] %>%
-                                  as.numeric() %>% as.data.frame()
-    names(Mort) = paste0(disturbance,"_",scenario)
-    if (nrow(TestData) == 0) {
-      TestData = Mort
-    } else {
-      TestData = cbind(TestData, Mort)
-    }
-  }
-  
-  
-}
-
-j=(1:8)
-TestData[ , j] = apply(TestData[ , j], 2,
-                    function(x) as.numeric(as.character(x)))
 
 kable(as.data.frame(Mortality_Agg), caption = "Mortality depending on the scenario")
 
@@ -249,13 +228,9 @@ theme(plot.title = element_text(hjust = 0.5))
 
 ```{r harvestest}
 
-shapiro.test(TestData$Harvest_BAU)
-shapiro.test(TestData$Harvest_Adapty)
-shapiro.test(TestData$Harvest_ProAct)
-
-wilcox.test(TestData$Harvest_BAU, TestData$Harvest_Adapty)
-wilcox.test(TestData$Harvest_BAU, TestData$Harvest_ProAct)
-wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+kable(as.data.frame(Mortality_Agg[Mortality_Agg$Disturbancy == "Harvest",]),
+      caption = "Biomass harvested depending on the scenario",
+      col.names = c("Disturbancy", "Scenario", "Mean biomass harvested", "Standard deviation inter-model"))
 
 ```
 
@@ -271,20 +246,13 @@ ylab("Biomass killed") +
 ggtitle("Insect outbreak by scenario") +
 theme(plot.title = element_text(hjust = 0.5))
 
-#kable(as.data.frame(cbind(MorTable$Scenario[MorTable$Disturbancy=="Insects"],
-#                          MorTable$Table[MorTable$Disturbancy=="Insects"])))
-
 ```
 
 ```{r insectstest}
 
-shapiro.test(TestData$Insects_BAU)
-shapiro.test(TestData$Insects_Adapty)
-shapiro.test(TestData$Harvest_ProAct)
-
-wilcox.test(TestData$Harvest_BAU, TestData$Insects_Adapty)
-wilcox.test(TestData$Harvest_BAU, TestData$Insects_ProAct)
-wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+kable(as.data.frame(Mortality_Agg[Mortality_Agg$Disturbancy == "Insects",]),
+      caption = "Insect mortality depending on the scenario",
+      col.names = c("Disturbancy", "Scenario", "Mean mortality", "Standard deviation inter-model"))
 
 ```
 
@@ -308,6 +276,13 @@ theme(plot.title = element_text(hjust = 0.5))
 
 ```
 
+```{r}
+kable(as.data.frame(Mortality_Agg[Mortality_Agg$Disturbancy == "Fire accidental",]),
+      caption = "Accidental fire mortality depending on the scenario",
+      col.names = c("Disturbancy", "Scenario", "Mean mortality", "Standard deviation inter-model"))
+```
+
+
   ii) Natural
 
 ```{r FireNat}
@@ -322,13 +297,9 @@ theme(plot.title = element_text(hjust = 0.5))
 
 ```{r fireacctest}
 
-shapiro.test(TestData$Fire lightning_BAU)
-shapiro.test(TestData$Fire lightning_Adapty)
-shapiro.test(TestData$Harvest_ProAct)
-
-wilcox.test(TestData$Harvest_BAU, TestData$Fire lightning_Adapty)
-wilcox.test(TestData$Harvest_BAU, TestData$Fire lightning_ProAct)
-wilcox.test(TestData$Harvest_Adapty, TestData$Harvest_ProAct)
+kable(as.data.frame(Mortality_Agg[Mortality_Agg$Disturbancy == "Fire lightning",]),
+      caption = "Natural fire mortality depending on the scenario",
+      col.names = c("Disturbancy", "Scenario", "Mean mortality", "Standard deviation inter-model"))
 
 ```
 
@@ -337,25 +308,27 @@ Mean mortality, max, f pics
 biomass recover after disturbancy (slope).
 
 ```{r fire}
-Zero = paste0(BAU_input, "..1/scrapple-fire/flaming-consumptions-1.img") %>% raster()
 
+
+# Raster of zeros with the proper definition and extent
+Zero = paste0(BAU_input, "..1/scrapple-fire/flaming-consumptions-1.img") %>% raster()
 Zero[Zero != 0] = 0
 
+# Empty sets where the information will be stacked
 RasterStack_Burn = stack()
 RasterStack_AllF = stack()
 RasterStack_AccF = stack()
 RasterStack_NatF = stack()
-RasterStack_RxF = stack()
 
 for(scenario in ListScenario){
-    
+ # When changing a scenario, the input file change
+ # and the total burned and frequency scenarios are initialised to 0
   if(scenario == "BAU") {
     Input = BAU_input
     TotBurn = Zero
     FreqAllT = Zero
     FreqAcc = Zero
     FreqNat = Zero
-    FreqRx = Zero
   } else if(scenario == "Adapty"){
     Input = Adapty_input
     TotBurn = Zero
@@ -363,65 +336,66 @@ for(scenario in ListScenario){
     FreqAllT = Zero
     FreqAcc = Zero
     FreqNat = Zero
-    FreqRx = Zero
   } else {
     Input = ProAct_input
     TotBurn = Zero
     TotBurn = Zero
     FreqAllT = Zero
     FreqAcc = Zero
-    FreqNat = Zero
-    FreqRx = Zero}
+    FreqNat = Zero}
   
   for (i in 1:100) {
+    # The total burned biomass is the biomass burned the previous years
+    # added to the flaming and smolder consumptions of the ongoing year
     Raster_fc = paste0(Input, "..1/scrapple-fire/flaming-consumptions-",i,".img") %>% raster()
     Raster_sm = paste0(Input, "..1/scrapple-fire/smolder-consumption-",i,".img") %>% raster()
     RasterBurn = Raster_fc + Raster_sm
     TotBurn = TotBurn + RasterBurn
     
     Raster_FT = paste0(Input, "..1/scrapple-fire/ignition-type-",i,".img") %>% raster()
+    Raster_FT[Raster_FT == 1] = 0 # the unburned area (map code 1) is not considered here
     
-    Raster_FT[Raster_FT == 1] = 0
-    
+    # The sum of all types of fires is the zones where a fire append the previous years
+    # (all the types of fire takes the map code 1), added to the zones of the ongoing year
     Raster_AllT = Raster_FT
-    Raster_FT[Raster_FT != 0] = 1
-    FreqAllT = FreqAllT + Raster_FT
+    Raster_AllT[Raster_AllT != 0] = 1
+    FreqAllT = FreqAllT + Raster_AllT
     
+    # The same is done with accidental fires
+    # (initial map code 2 turned to 1, all the rest 0)
     Raster_Acc = Raster_FT
-    Raster_Acc[Raster_Acc != 2] = 0
     Raster_Acc[Raster_Acc == 2] = 1
+    Raster_Acc[Raster_Acc != 1] = 0
     FreqAcc = FreqAcc + Raster_Acc
     
+    # Idem with natural fires
     Raster_Nat = Raster_FT
-    Raster_Nat[Raster_Nat != 3] = 0
     Raster_Nat[Raster_Nat == 3] = 1
+    Raster_Nat[Raster_Nat != 1] = 0
     FreqNat = FreqNat + Raster_Nat   
     
-    Raster_Rx = Raster_FT
-    Raster_Rx[Raster_Rx != 4] = 0
-    Raster_Rx[Raster_Rx == 4] = 1
-    FreqRx = FreqRx + Raster_Rx
-
     if(i==100){
-      #TotBurn[TotBurn == 0] = NA
+      
+      # The total after the 100 years of run is saved
+      TotBurn[TotBurn == 0] = NA
       names(TotBurn) = scenario
       RasterStack_Burn = stack(RasterStack_Burn, TotBurn)
       
-      #FreqAllT[FreqAllT == 0] = NA
+      FreqAllT[FreqAllT == 0] = NA
+      FreqAllT = FreqAllT/100
       names(FreqAllT) = paste0(scenario,"all")
       RasterStack_AllF = stack(RasterStack_AllF, FreqAllT)
       
-      #FreqAcc[FreqAcc == 0] = NA
+      FreqAcc[FreqAcc == 0] = NA
+      FreqAcc = FreqAcc/100
       names(FreqAcc) = paste0(scenario,"Acc")
       RasterStack_AccF = stack(RasterStack_AccF, FreqAcc)
       
-      #FreqNat[FreqNat == 0] = NA
-      names(Raster_Nat) = paste0(scenario,"Nat")
+      FreqNat[FreqNat == 0] = NA
+      FreqNat = FreqNat/100
+      names(FreqNat) = paste0(scenario,"Nat")
       RasterStack_NatF = stack(RasterStack_NatF, FreqNat)
-      
-      #FreqRx[FreqRx == 0] = NA
-      names(FreqRx) = paste0(scenario,"Rx")
-      RasterStack_RxF = stack(RasterStack_RxF, FreqRx)
+
       
     }
       }
@@ -434,7 +408,7 @@ for(scenario in ListScenario){
 VarSatck = RasterStack_Burn
   Max = max(maxValue(VarSatck))+1
   Min = min(minValue(VarSatck))
-  brks = seq(Min,Max,by=0.1)
+  brks = seq(Min,Max,by=10000)
   nbrks = length(brks)-1
   r.range = c(Min, Max)
   
@@ -443,11 +417,10 @@ values(rasTot) = c(Min,Max)
 
 par(mfrow=c(1,3))
 
-plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max), 
-main = "Sum of biomass burned")
+plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max))
 plot(rasTot, legend.only=TRUE, col=pal.2(nbrks),
     legend.width=1, legend.shrink=0.75,
-    legend.args=list(text="??",
+    legend.args=list(text="Biomass burned ()",
                      side=4, font=2, line=2.5, cex=0.8))
 
 ```
@@ -455,7 +428,7 @@ plot(rasTot, legend.only=TRUE, col=pal.2(nbrks),
 
 ```{r tipe}
 
-VarSatck = stack(RasterStack_AllF, RasterStack_AccF, RasterStack_NatF,RasterStack_RxF)
+VarSatck = stack(RasterStack_AllF)
   Max = max(maxValue(VarSatck))+1
   Min = min(minValue(VarSatck))
   brks = seq(Min,Max,by=0.1)
@@ -467,11 +440,10 @@ values(rasTot) = c(Min,Max)
   
 par(mfrow=c(1,3))
 
-plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max), 
-main = "Frequency of all fire types")
+plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max))
 plot(rasTot, legend.only=TRUE, col=pal.2(nbrks),
     legend.width=1, legend.shrink=0.75,
-    legend.args=list(text="??",
+    legend.args=list(text="Proportion of years with fire",
                      side=4, font=2, line=2.5, cex=0.8))
 
 VarSatck = RasterStack_AccF
@@ -483,11 +455,10 @@ VarSatck = RasterStack_AccF
 
 par(mfrow=c(1,3))
 
-plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max), 
-main = "Frequency of accidental fire")
+plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max))
 plot(rasTot, legend.only=TRUE, col=pal.2(nbrks),
     legend.width=1, legend.shrink=0.75,
-    legend.args=list(text="??",
+    legend.args=list(text="Proportion of years with fire",
                      side=4, font=2, line=2.5, cex=0.8))
 
 VarSatck = RasterStack_NatF
@@ -499,27 +470,10 @@ VarSatck = RasterStack_NatF
 
 par(mfrow=c(1,3))
 
-plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max), 
-main = "Frequency of natural fire")
+plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max))
 plot(rasTot, legend.only=TRUE, col=pal.2(nbrks),
     legend.width=1, legend.shrink=0.75,
-    legend.args=list(text="??",
-                     side=4, font=2, line=2.5, cex=0.8))
-
-VarSatck = RasterStack_RxF
-  Max = max(maxValue(VarSatck))+1
-  Min = min(minValue(VarSatck))
-  brks = seq(Min,Max,by=0.1)
-  nbrks = length(brks)-1
-  r.range = c(Min, Max)
-
-par(mfrow=c(1,3))
-
-plot(VarSatck, breaks=brks,col=pal.2(nbrks), legend = F, zlim=c(Min,Max), 
-main = "Frequency of prescribed fire")
-plot(rasTot, legend.only=TRUE, col=pal.2(nbrks),
-    legend.width=1, legend.shrink=0.75,
-    legend.args=list(text="??",
+    legend.args=list(text="Proportion of years with fire",
                      side=4, font=2, line=2.5, cex=0.8))
 
 ```
