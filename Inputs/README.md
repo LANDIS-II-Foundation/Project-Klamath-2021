@@ -1,6 +1,16 @@
 # Input files used on the study
 
-Here are presented the files used to run the LANDIS-II simulations.
+Here are available the files used to run the LANDIS-II simulations.
+
+## Origin of the data
+
+Majority of the data comes from Serra-Diaz *et al.* 2018 Scientific Reports and from Maxwell *et al.* 2021 Journal of Applied Ecology.
+
+"These input files have been updated and subset to the California side of the study area only.  
+New soils inputs are derived from a gridded SSURGO product for California dating from 2017. 
+New IC map derived from Riley et al. 2019 interpolated plotlist/treelist.
+New fire inputs for use with the SCRPPLE fire extension are based on the Short et al. 2017 dataset.
+Insect inputs based on methods employed for the TCSI project, where timing of outbreak is based on USFS ADS outbreaks and mortality based on Fettig et al. 2019/Stanislaus plots."
 
 ## Experimental design
 
