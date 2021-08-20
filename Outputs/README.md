@@ -1,7 +1,7 @@
 # From outputs to results
 
-The outputs are obtained by running the LANDIS-II simulations as presented in the "Inputs" folder.
-They are not present here because of the important storage place they need.
+The outputs are obtained by running the LANDIS-II simulations as presented in the "/Inputs" folder.
+They are not present here because of the important storage place they need but can easely be recreated after downloading the installers (see "/Installers" folder) and the inputs.
 
 The scripts used to obtain the results from these outputs are available on this folder.
 The ".rmd" files can be directly used and are available on the folder "R project Results".
