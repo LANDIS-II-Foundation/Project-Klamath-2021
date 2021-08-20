@@ -26,7 +26,7 @@ All the files presented here are needed to run a scenario.
 As an example, to run a Business As Usual scenario, it is needed to have on a same folder :
 
 - The files of the "Base Inputs" folder
-- The files of the link on the "Heavy base inputs" txt file
+- The files of the link above
 - The files of the "Business As Usual" folder
 
 To run a simulation a second time, you just have to copy/paste the folder and run LANDIS-II again.
