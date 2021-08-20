@@ -19,7 +19,7 @@ Thus, six simulations were performed in total.
 
 ## Files common to all simulations
 
-In the folder "/Base Inputs" are available the files in common to all the simulations. Among these, some climate files are too heavy for Git hub.
+In the folder "/Base Inputs" are available the files in common to all the simulations. Among these, some climate files are too heavy for GitHub.
 These can be downloaded using the link :
 
 https://drive.google.com/drive/folders/1v7sWObyZZXU-ECyKNxNvC_JpUA_orBtp?usp=sharing
