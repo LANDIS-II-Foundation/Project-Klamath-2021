@@ -1,0 +1,295 @@
+---
+title: "Comparison of two intensities of Insect Risk managment implementation \non
+  the Adaptability scenario"
+author: "Vincent Bisquay Gracia"
+date: "10/06/2021"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+# I. set up
+
+Used pakages :
+
+```{r setup, message=FALSE, warning=FALSE}
+
+wd = "D:/Internship 3A/GitHub/Project-Klamath-2021/Outputs/R"
+setwd(wd)
+
+library(magrittr)
+library(cowplot)
+library(ggplot2)
+library(raster)
+library(knitr)
+
+```
+
+```{r data}
+
+BAU_input =
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest BAU/"
+
+Adapty_input = 
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Adaptability/"
+
+```
+
+# I. Difference between the two sub-scenarios
+
+The adaptability scenario (abreviated on the data as "Adapty") have two different implementations for the Insect Risk prescription. As we want to test them here, both vertions of the Adapty scenario are treated like a sub-scenario.
+
+- The *Adapty_lowIR* use the Insect Risk (IR) prescription only on the management areas where Salvage planting was performed on the Business As Usual (BAU) scenario. Moreover, the percentage of cells affected by management area is the same than the Salvage planting on the BAU scenario. As the Salvage planting is not performed on the Adapty scenario, it is remplaced by the IR scenario, making sure the number of cells managed by management area is the same between the Adapty and the BAU scenarios.
+
+- The *Adapty_highIR* use the IR prescription on all the management areas and at a percentage of cells affected by management area that is independent of the Salvage planting scenario and that is more important that in the *Adapty_lowIR* sub-scenario.
+
+The different implementations are compared here : 
+
+```{r comp2}
+
+data.frame("BAU" = c("Salvage_plant","/","0.3%","0.5%","0.5%", "0.3%","/"),
+  "Adapty_lowIR" = c("InsectRisk","/","0.3%","0.5%","0.5%", "0.3%","/"),
+  "Adapty_highIR" = c("InsectRisk","3%","3%","5%","5%", "3%","3%"),
+  row.names = c("Prescription used","Federal", "Tribal Area",
+      "PIF", "PNIF","Matrix timberlands","AMA")) %>% kable(
+      caption = "Percentage of cells in a management area to be 
+      treated on different scenarios")
+
+```
+
+If it is observed that the two Adapty scenarios have no difference with the BAU one concerning the insects outbreak, the IR prescription will not be validated and no longer used on the simultations.
+
+If it appears that having an IR prescrition have an influence, but that it is the same between *Adapty_lowIR* and *Adapty_highIR*, the low one will be used to mantaint the same percentage of cell affected by management area.
+
+# II. Comparison of the biomass removed
+
+The total of the biomass harvested during the 80 years of the run is compared between the sub scenarios.
+
+```{r harvest}
+BAU_Harvest1 =  paste(BAU_input,"..1//harvest/summary-log.csv",sep="") %>% read.csv()
+BAU_Harvest1$Scenario = "BAU"
+
+Adapty_Harvest1 = paste(Adapty_input,"..0//harvest/summary-log.csv",sep="") %>%
+  read.csv()
+Adapty_Harvest1$Scenario = "Adapty_lowIR"
+
+Adapty_Harvest2 = paste(Adapty_input,"..1//harvest/summary-log.csv",sep="") %>%
+  read.csv()
+Adapty_Harvest2$Scenario = "Adapty_highIR"
+
+Tot_Harvest = rbind(BAU_Harvest1, Adapty_Harvest1, Adapty_Harvest2)
+
+Harvest = cbind(Tot_Harvest$Time,
+                Tot_Harvest$TotalBiomassHarvested,
+                Tot_Harvest$Scenario) %>% as.data.frame()
+
+colnames(Harvest) = c("Time", "Harvest","Scenario")
+
+Harvest$Time = Harvest$Time %>% as.numeric()
+Harvest$Harvest = Harvest$Harvest %>% as.numeric()
+
+Harvest$Harvest = Harvest$Harvest*100
+
+ggplot(Harvest, aes(x=Scenario, y=Harvest, col=Scenario, fill=Scenario)) +
+  geom_bar(stat="identity") +
+ #scale_x_discrete(name ="Scenario", 
+#                    limits=c("Business as usual","Adaptability")) +
+  ylab("Biomass removed") +
+  ggtitle("Harvest by scenario") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+S_BAU = Harvest$Harvest[Harvest$Scenario == "BAU"] %>% sum()
+S_Adapty_lowIR = Harvest$Harvest[Harvest$Scenario == "Adapty_lowIR"] %>% sum()
+S_Adapty_highIR = Harvest$Harvest[Harvest$Scenario == "Adapty_highIR"] %>% sum()
+```
+
+```{r harvest2}
+kable(data.frame("Biomass_removed" = c(S_BAU, S_Adapty_lowIR, S_Adapty_highIR),
+           row.names = c("Business as usual","Adaptability low IR", "Adaptability high IR")),
+      caption = "Mortality depending on the scenario")
+
+```
+
+The biomass removed on the two sub-scenarios is similar if we compare it to the BAU scenario. The biomass removed in the *Adapty_highIR* is superior than the low one. This is not an issue, as the objective is to compare two strategies and techniques of management scerarios on a landscape, and not two intensities of management. Having a too important difference of biomass removed can constitute a bias, and minimizing it is then interesting.
+
+Looking at the biomass harvested, the *Adapty_highIR* sub-scenario seems a suitable vertion of the Adaptability scenario.
+
+# III. Outbreaks analysis
+
+## III.a) Data preparation
+
+To see if the IR prescription is efficient, the biomass killed by insects (insect mortality) is compared on the different scenarios. To avoid an overestimation of mortality and to make sure that all the data frames have the same length, the years without insect outbreak are added with a mortality of 0.
+
+```{r mortality}
+
+BAU_BDA_Tot = paste(BAU_input,"..1/bda_log.csv",sep="") %>% read.csv()
+BAU_BDA = cbind(BAU_BDA_Tot$Time, BAU_BDA_Tot$TotalBiomassMortality) %>% as.data.frame()
+colnames(BAU_BDA) = c("Time", "Mortality")
+
+BAU_BDA = aggregate(BAU_BDA$Mortality, by=list(Time=BAU_BDA$Time), FUN=sum)
+
+colnames(BAU_BDA) = c("Time", "Mortality")
+
+
+for(i in (1:100)){
+  if(!(i %in% BAU_BDA$Time)){
+    BAU_BDA = rbind(BAU_BDA, c(i,0))
+  }
+}
+
+Adapty_lowIR_BDA_Tot = paste(Adapty_input,"..0/bda_log.csv",sep="") %>% read.csv()
+Adapty_lowIR_BDA = cbind(Adapty_lowIR_BDA_Tot$Time, Adapty_lowIR_BDA_Tot$TotalBiomassMortality) %>% as.data.frame()
+colnames(Adapty_lowIR_BDA) = c("Time", "Mortality")
+
+Adapty_lowIR_BDA = aggregate(Adapty_lowIR_BDA$Mortality, by=list(Time=Adapty_lowIR_BDA$Time), FUN=sum)
+
+colnames(Adapty_lowIR_BDA) = c("Time", "Mortality")
+
+for(i in (1:100)){
+  if(!(i %in% Adapty_lowIR_BDA$Time)){
+    Adapty_lowIR_BDA = rbind(Adapty_lowIR_BDA, c(i,0))
+  }
+}
+
+Adapty_highIR_BDA_Tot = paste(Adapty_input,"..1/bda_log.csv",sep="") %>% read.csv()
+Adapty_highIR_BDA = cbind(Adapty_highIR_BDA_Tot$Time, Adapty_highIR_BDA_Tot$TotalBiomassMortality) %>% as.data.frame()
+colnames(Adapty_highIR_BDA) = c("Time", "Mortality")
+
+Adapty_highIR_BDA = aggregate(Adapty_highIR_BDA$Mortality, by=list(Time=Adapty_highIR_BDA$Time), FUN=sum)
+
+colnames(Adapty_highIR_BDA) = c("Time", "Mortality")
+
+for(i in (1:100)){
+  if(!(i %in% Adapty_highIR_BDA$Time)){
+    Adapty_highIR_BDA = rbind(Adapty_highIR_BDA, c(i,0))
+  }
+}
+
+```
+
+The operation is done for the Biomass BDA log files of each scenario, after what their merged into a signle one.
+
+```{r mergemort}
+names(Harvest)[names(Harvest) == "Harvest"] = "Mortality"
+Harvest$Disturbancy = "Harvest"
+
+BAU_BDA$Scenario = "BAU"
+
+Adapty_lowIR_BDA$Scenario = "Adapty_lowIR"
+
+Adapty_highIR_BDA$Scenario = "Adapty_highIR"
+
+BDA = rbind(BAU_BDA, Adapty_lowIR_BDA, Adapty_highIR_BDA)
+
+```
+
+## III.b) Mortality of each type of insect outbreak
+
+The mortality due to the different types of insect outbreaks is compared for each scenario.
+
+```{r look}
+
+title = ggdraw() + 
+  draw_label("Mortality by type of outbreak on the different scenarios",
+    fontface = 'bold', x = 0, hjust = 0) +
+  theme(plot.margin = margin(0, 0, 0, 7))
+
+BAU_BDA_Tot$Scenario = "BAU"
+Adapty_lowIR_BDA_Tot$Scenario = "Adapty_lowIR"
+Adapty_highIR_BDA_Tot$Scenario = "Adapty_highIR"
+BDA_Tot = rbind(BAU_BDA_Tot,Adapty_lowIR_BDA_Tot,Adapty_highIR_BDA_Tot)
+
+pInsect = ggplot(BDA_Tot, aes(x=AgentName, y=TotalBiomassMortality)) +
+  geom_bar(stat='identity') +
+  xlab("Type of insect disturbacy") +
+  ylab("Mortality in biomass") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 30, hjust = 1))+
+  facet_wrap(~Scenario)
+
+plot_grid(title, pInsect, ncol = 1, rel_heights = c(0.1, 1))
+
+```
+
+The hierarchy of the insects causing the most important mortality is the same for all the scenarios. However, the IR seems to disminish the biomass killed, particularly for the White Pine Beetle. This is consistent with the parametrisation of the prescription, as the first targeted species is Pinus Ponderosa, the only species attacked by the White Pine Beetle.
+
+The interest of the *Adapty_highIR* vertion over the *Adapty_lowIR* one seems here to be validated.
+
+```{r looktot}
+
+ggplot(BDA_Tot, aes(x=Scenario, y=TotalBiomassMortality, col=Scenario,fill=Scenario)) +
+  geom_bar(stat='identity') +
+  xlab("Scenario") +
+  ylab("Mortality in biomass") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+## III.c) Statistical analyses of the total mortality by insects
+
+The data tested is the mortality by year.
+
+As observed before, the IR prescription decreases the mortality due to insect. It is confirmed here by the means of mortality by scenario and by the mortality per year.
+
+```{r datatest}
+
+Mortality_BAU = mean(BAU_BDA$Mortality)
+sd_BAU = sd(BAU_BDA$Mortality)
+
+Mortality_Adapty_lowIR = mean(Adapty_lowIR_BDA$Mortality)
+sd_Adapty_lowIR = sd(Adapty_lowIR_BDA$Mortality)
+
+Mortality_Adapty_highIR = mean(Adapty_highIR_BDA$Mortality)
+sd_Adapty_highIR = sd(Adapty_highIR_BDA$Mortality)
+
+kable(data.frame("Mean_Mortality_by_insects" = c(Mortality_BAU,Mortality_Adapty_lowIR,Mortality_Adapty_highIR),
+                             "Standard_error" = c(sd_BAU,sd_Adapty_lowIR,sd_Adapty_highIR),
+           row.names = c("Business as usual","Adapty_lowIR", "Adapty_highIR")),
+      caption = "Mortality depending on the scenario")
+```
+
+```{r mort3, message=F, warning=F}
+
+
+ggplot(BDA, aes(x=Time, y=Mortality, color=Scenario, group=Scenario)) +
+  geom_area(aes(fill=Scenario)) +
+  xlab("Time (years)") +
+  ylab("Mortality in biomass") +
+  ggtitle("Evolution of mortality due to insects on different scenarios") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+We want now to know if this difference is significant.
+First, the normality is tested.
+
+```{r norm}
+shapiro.test(BAU_BDA$Mortality)
+shapiro.test(Adapty_lowIR_BDA$Mortality)
+shapiro.test(Adapty_highIR_BDA$Mortality)
+
+```
+
+The null hypothesis ($H_{0}$: The population follows a normal distribution) is invalidated. A non parametric test is then performed.
+
+The question is now to determine if the two sets of data are paired or not. As the data is the result of a model and not a sampling from a biger population, the answer is complex. The two scenarios use the same climate data, so it can be said that each year is paired beacause subject of the same climatic conditions. However, the initials conditions is a source of dependency between the model results that is far more important. Indeed, the initialals conditions are the same for all the scenarios, the results being identical at the begining and diverging with the year.
+
+Despite that, as we only want to compare two means independently of the spacial variations, it was decided to do a classical non-parametrical test for paired data, the Wilcoxon Test.
+
+```{r comp1}
+wilcox.test(Adapty_lowIR_BDA$Mortality, Adapty_highIR_BDA$Mortality, paired=T)
+
+wilcox.test(BAU_BDA$Mortality, Adapty_lowIR_BDA$Mortality, paired=T)
+
+wilcox.test(BAU_BDA$Mortality, Adapty_highIR_BDA$Mortality, paired=T)
+
+```
+
+Looking at the p-values, it apears that the two sub-scenario are significantly different from one another, implying that the difference on the IR prescription have a repercution on the insect outbreak mortality.
+While the *Adapty_lowIR* scenario is not significantly different from the BAU scenario, the *Adapty_highIR* is, meaning that the IR scenario, if intensively prescribed, can significatively reduce the insect outbreak mortality.
+
+This second result is also consistent with the choice of the *Adapty_highIR* sub-scenario as final version of the Adapty scenario.
+
+
+

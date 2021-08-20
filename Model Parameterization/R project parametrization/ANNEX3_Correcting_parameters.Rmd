@@ -3,6 +3,7 @@ title: "Correcting parameters"
 author: "Vincent Bisquay Gracia"
 date: "27/04/2021"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---

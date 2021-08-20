@@ -1,0 +1,1620 @@
+---
+title: "Results"
+author: "Vincent Bisquay Gracia"
+date: "12/05/2021"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+This document detail all the method used to obtain the results of the study. All results presented here are not on the report.
+
+# I. set up
+
+Working directory and used pakages:
+
+```{r setup, message=FALSE, warning=FALSE}
+
+wd = "D:/Internship 3A/GitHub/Project-Klamath-2021/Outputs/R"
+
+setwd(wd)
+library(magrittr)
+library(cowplot)
+library(ggplot2)
+library(raster)
+library(knitr)
+library(tibble)
+library(dplyr)
+
+```
+
+Input folders and name of the scenarios:
+
+```{r data}
+
+BAU_input =
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest BAU/"
+Adapty_input = 
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Adaptability/"
+ProAct_input =
+  "E:/FIF/Stage 3A/Extract/Documents/Klamath_(CA_only)_2021 - Harvest Pro-active/"
+
+ListScenario = c("Business as usual","Adaptability","Pro-Active")
+
+```
+
+Palettes of color used for map plot:
+
+```{r col}
+pal.3 = colorRampPalette(c("grey","purple","yellow"))
+
+pal.sd = colorRampPalette(c("grey","blue","cyan"))
+
+pal.dif = colorRampPalette(c("red","tomato", "darkgoldenrod1","cyan3","cyan","blue"))
+
+```
+
+Some of the rasters used in this part have not a defined system of projection. The one of the management area is used as a reference for rasters that will be exported.
+
+```{r ref}
+
+Ownership_OnlyCA = raster("D:/Internship 3A/GitHub/Project-Klamath-2021/Model Parameterization/R inputs and outputs/Ownership_OnlyCA.tif")
+
+CRSRef = crs(Ownership_OnlyCA)
+NrowRef = Ownership_OnlyCA@nrows
+NcolRef = Ownership_OnlyCA@ncols
+ResRef = res(Ownership_OnlyCA)[1]
+XminRef = Ownership_OnlyCA@extent@xmin
+XmaxRef = Ownership_OnlyCA@extent@xmax
+YminRef = Ownership_OnlyCA@extent@ymin
+YmaxRef = Ownership_OnlyCA@extent@ymax
+
+```
+
+# II. Carbon balance
+
+If the management scenarios were improving adaptation, the mitigation of climate change by stocking carbon is an important ecosystem service that is usually used for international environmental policy purposes. The NEEC (Net Ecosystem Exchange of Carbon) measures the total flux of carbon (difference between carbon fixed on the ecosystem and carbon released on the atmosphere).
+
+The general method used to obtain the data is common for all the results. For all the two model run (stocked in files names "..1" and "..2", cf. Inputs) and for all scenarios, the output file (here the *NECN-succession-log.csv* table) is imported. The interest data (here NEEC column) is selected, aggregated (no need to differenciate the ecoregions) and caracterised by run and scenario. The 6 data frame created (2 runs for the 3 scenarios) are then merged into a final one *NEEC*.
+
+```{r C}
+
+NEEC = data.frame()
+
+for(j in c(1,2)){
+  
+  if(j == 1) { run = "..1"
+  } else { run = "..2"}
+
+  for(scenario in ListScenario){
+    
+    if(scenario == "Business as usual") {Input = BAU_input
+    } else if(scenario == "Adaptability"){Input = Adapty_input
+    } else {Input = ProAct_input}
+    
+    NECNlog = paste0(Input, run, "/NECN-succession-log.csv") %>% read.csv()
+    NEEClog = aggregate(NECNlog$NEEC, by=list(Time=NECNlog$Time), FUN=sum)
+    colnames(NEEClog) = c("Time","NEEC")
+    NEEClog$NEEC = NEEClog$NEEC*10^-6 # convertion g/m² to Mg/m²
+    NEEClog$Scenario = scenario
+    NEEClog$Run = j
+    
+    NEEC = rbind(NEEC,NEEClog)
+  }
+}
+
+```
+
+The obtained dataframe gives the NEEC for each year, scenario and run of the model.
+
+```{r C1}
+
+kable(as.data.frame(head(NEEC)),
+      caption = "Insight of the data used concerning the Net Ecosystem Exchange of Carbon")
+
+```
+
+To compare the NEEC between scenarios and disturbances, it is firs added for a same scenario and on for same run (*Mortality_Sum*). After that, a mean of the NEEC calculated is obtained, using the results of the two runs. Thus, a mean of total mortality is obtained for a same scenario (*Mortality_Agg*).
+
+In addition, the standard deviation between the runs is calculated to measure the varibility of the model. As the function *sd()* is used for the "sample stadard deviation" $s$ (equation 1), it uses the Bessel's correction. As here the data is not a sample of an existing population but results of models, we multiply the standard deviation calculated by the inverse of the Bessel factor to obtain the uncorrected standard deviation $s_{n}$ (equation 2).
+
+Equation 1:
+$$s = \sqrt{\displaystyle \frac{\nu}{1-n}}$$
+Equation 2:
+$$\begin{aligned}
+s_{n} & = \sqrt{\displaystyle \frac{\nu}{n}} \\
+\Longleftrightarrow s_{n} & = s\sqrt{\displaystyle\frac{n-1}{n}} \\
+\end{aligned}$$
+
+With:
+
+  - $n$ the number of observations on a sample. As we are considerating results of runs and the varibility between them, the number of observations is here the number of runs.
+
+  - $\nu$ the sum of squares deviation from the mean. 
+
+The coeficient $\sqrt{\displaystyle\frac{n-1}{n}}$ is stocked in the variable called *InvBessel* and will be used for all standard deviation calculus on this work.
+
+```{r regroupNEEC, message=FALSE, warning=FALSE}
+
+NEEC_Sum = NEEC %>% group_by(Scenario, Run) %>%
+      summarise(NEECSum = sum(NEEC))
+
+InvBessel = (ncol(NEEC)-1)/ncol(NEEC_Sum) %>% sqrt()
+
+NEEC_Agg = NEEC_Sum %>% group_by(Scenario) %>%
+      summarise(NEECMean = mean(NEECSum), NEECSd = sd(NEECSum)*InvBessel)
+
+```
+
+Finally, to plot the data against time, the mean and standard deviation are calculated for each year. The operations are done in the same way than above.
+
+```{r regroupNEEC2, message=FALSE, warning=FALSE}
+
+NEEC_AggT = NEEC %>% group_by(Time, Scenario) %>%
+      summarise(NEECMean = mean(NEEC), NEECSd = sd(NEEC)*InvBessel)
+
+```
+
+The NEEC is plotted for each scenario.
+
+```{r NEECplot1, fig.cap= "Evolution of Net Ecosystem Exchange of Carbon"}
+
+ggplot(NEEC_AggT, aes(x=Time, y=NEECMean, col=Scenario, group=Scenario)) +
+  geom_line(size = 1)+
+  geom_errorbar(aes(ymin=NEECMean-NEECSd, ymax=NEECMean+NEECSd)) +
+  xlab("Time (years)") +
+  ylab("NEEC(Mg.m-2.yr-1)") +
+  ggtitle("Evolution of Net Ecosystem Exchange of Carbon") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+It doesn't seems to gives interesting information concerning the question. Thus, the total NEEC by scenario is plotted, to compare the global fluxes of carbon of the ecosystem on the 100 years of run. 
+
+```{r NEECplot2, fig.cap="Total Net Ecosystem Exchange of Carbon"}
+
+ggplot(NEEC_Agg, aes(x=Scenario, y=NEECMean, fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=NEECMean-NEECSd, ymax=NEECMean+NEECSd)) +
+ylab("NEEC (Mg.m-2)") +
+ggtitle("Total Net Ecosystem Exchange of Carbon") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+All the values are negative, signifying that the ecosystem, in all scenarios, stock more carbon than it releases in the atmosphere. The quantity of carbon stored increases with the degree of human intervention in the scenarios, showing the success of plantation strategie to stock carbon. Thus, with this criteria, the suitable management for climate adaptation is the Pro-active one.
+
+For the defense,a more accesible graphic is created with the absolute values.
+
+```{r NEECplot3, fig.cap="Total Carbon stocked"}
+
+ggplot(NEEC_Agg, aes(x=Scenario, y=abs(NEECMean), fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=abs(NEECMean)-NEECSd, ymax=abs(NEECMean)+NEECSd)) +
+ylab("|NEEC| (Mg.m-2)") +
+ggtitle("Total Carbon stocked") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+# III. Resilience and disturbances regimes
+
+## III.a) Mortality due to disturbances
+
+The biomass killed by fires that comes from lightnings (natural fire mortality), by fires coming from human activity (called here accidental fires, even if they can be intentionnal) and by insects (insect mortality) is compared on the different scenarios. To avoid an overestimation of mortality and to make sure that all the data frames have the same length, the years without insect outbreak are added with a mortality of 0. The biomass removed by harvest is also added as a mortality.
+
+```{r mort1, message=FALSE, warning=FALSE}
+
+Mortality = data.frame()
+
+for(j in c(1,2)){
+  
+  if(j == 1) { run = "..1"
+  } else { run = "..2"}
+
+  for(scenario in ListScenario){
+    
+    if(scenario == "Business as usual") {Input = BAU_input
+    } else if(scenario == "Adaptability"){Input = Adapty_input
+    } else {Input = ProAct_input}
+
+    BDA_Tot = paste0(Input, run, "/bda_log.csv") %>% read.csv()
+    BDA = cbind(BDA_Tot$Time, BDA_Tot$TotalBiomassMortality) %>% as.data.frame()
+    colnames(BDA) = c("Time", "Mortality")
+
+    BDA = aggregate(BDA$Mortality, by=list(Time=BDA$Time), FUN=sum)
+
+    colnames(BDA) = c("Time", "Mortality")
+    BDA$Mortality = BDA$Mortality*10^-6 # convertion g/m² to Mg/m²
+
+
+    for(i in (1:100)){ # years without insect outbreak are added with a mortality of 0
+      if(!(i %in% BDA$Time)){
+      BDA = rbind(BDA, c(i,0))
+      }
+    }
+
+    BDA$Disturbance = "Insects"
+    BDA$Scenario = scenario
+    BDA$Run = j
+
+    scrapple_Tot = paste0(Input, run, "/scrapple-summary-log.csv") %>% read.csv()
+    scrapple_Acc = cbind(scrapple_Tot$SimulationYear,
+                    scrapple_Tot$TotalBiomassMortalityAccidental) %>% as.data.frame()
+    colnames(scrapple_Acc) = c("Time", "Mortality")
+    scrapple_Acc$Mortality = scrapple_Acc$Mortality*10^-6
+    scrapple_Acc$Disturbance = "Fire accidental"
+    scrapple_Acc$Scenario = scenario
+    scrapple_Acc$Run = j
+
+    scrapple_Nat = cbind(scrapple_Tot$SimulationYear,
+                    scrapple_Tot$TotalBiomassMortalityLightning) %>% as.data.frame()
+    colnames(scrapple_Nat) = c("Time", "Mortality")
+    
+    scrapple_Nat$Disturbance = "Fire lightning"
+    scrapple_Nat$Scenario = scenario
+    scrapple_Nat$Run = j
+    scrapple_Nat$Mortality = scrapple_Nat$Mortality*10^-6
+    
+    Harvest_Tot =  paste0(Input, run, "/harvest/summary-log.csv") %>% read.csv()
+    Harvest = Harvest_Tot %>% group_by(Time) %>%
+      summarise(TotalBiomassHarvested = sum(TotalBiomassHarvested))
+    colnames(Harvest) = c("Time", "Mortality")
+    Harvest$Mortality = Harvest$Mortality %>% as.numeric()
+    Harvest$Mortality = Harvest$Mortality*10^-4 # convertion Mg/ha in Mg/m²
+    Harvest$Disturbance = "Harvest"
+    Harvest$Scenario = scenario
+    Harvest$Run = j
+  
+    Mortality = rbind(Mortality, BDA, scrapple_Acc, scrapple_Nat, Harvest)
+  }
+}
+  
+```
+
+The obtained dataframe gives all mortality (Mg/m²) for each year, disturbance, scenario and run of the model (2 per scenario). 
+
+```{r dfmort1}
+
+kable(as.data.frame(head(Mortality)),
+      caption = "Insight of the data used concerning mortality")
+
+```
+
+The following operations are similar to the one above. To compare the mortality between scenarios and disturbances, all the mortality of a same disturbancy, on the same scenario and on for same run is added (*Mortality_Sum*). After that, a mean of the mortality calculated is obtained, using the results of the two runs. Thus, a mean of total mortality is obtained for a same disturbance and scenario(*Mortality_Agg*).
+In addition, the standard deviation between the runs is calculated to measure the varibility of the model.
+
+```{r mort2, message=FALSE, warning=FALSE}
+
+Mortality_Sum = Mortality %>% group_by(Disturbance, Scenario, Run) %>%
+      summarise(MortalitySum = sum(Mortality))
+
+InvBessel = (ncol(Mortality_Sum)-1)/ncol(Mortality_Sum) %>% sqrt()
+
+Mortality_Agg = Mortality_Sum %>% group_by(Disturbance, Scenario) %>%
+      summarise(MortalityMean = mean(MortalitySum),
+                MortalitySd = sd(MortalitySum)*InvBessel)
+
+```
+
+Finally, to plot the data against time, the mean and standard deviation are calculated for each year. The operations are done in the same way than above. As the evolution in time is interesting only for the harvest mortaily analyses, all others disturbances are previously merged.
+
+```{r mort3, message=FALSE, warning=FALSE}
+
+Mortality_AggT = Mortality
+
+Mortality_AggT$Disturbance[which(Mortality_AggT$Disturbance != "Harvest")] =
+  "Other disturbances"
+
+Mortality_AggT = Mortality_AggT %>% group_by(Time, Disturbance, Scenario, Run) %>%
+      summarise(MortalitySum = sum(Mortality))
+
+Mortality_AggT = Mortality_AggT %>% group_by(Time, Disturbance, Scenario) %>%
+      summarise(MortalityMean = mean(MortalitySum),
+                MortalitySd = sd(MortalitySum)*InvBessel)
+
+```
+
+A data frame with all the data necessary for the mortality analizes is then created:
+
+```{r mort4}
+
+kable(as.data.frame(Mortality_Agg), caption = "Mortality depending on the scenario")
+
+```
+
+The mortality by disturbancy and by scenario can then be plotted. On the following sections, the disturbancies will be detailed one by one.
+
+```{r totmortcomp, fig.cap="Total mortality by scenario and disturbancy"}
+
+ggplot(Mortality_Agg, aes(x=Disturbance, y=MortalityMean, fill = Disturbance)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
+  xlab("Type of Disturbance") +
+  ylab("Mortality in biomass(Mg.m-2)") +
+  ggtitle("Total mortality by scenario and disturbancy") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~Scenario, ncol=3)
+
+```
+
+To avoid repetition, the scripts performing mean and stadard deviation calculus as well as ploting figures and tables will not be shown.
+
+### III.a.1) Harvest
+
+```{r harvestplot, echo=FALSE, fig.cap="Harvest by scenario"}
+
+ggplot(Mortality_Agg[Mortality_Agg$Disturbance=="Harvest",], aes(x=Scenario, y=MortalityMean, fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
+ylab("Biomass removed (Mg.m-2)") +
+ggtitle("Harvest by scenario") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r harvest1, echo=FALSE}
+
+kable(as.data.frame(Mortality_Agg[Mortality_Agg$Disturbance == "Harvest",]),
+      caption = "Biomass harvested depending on the scenario",
+      col.names = c("Disturbance", "Scenario", "Mean biomass harvested (Mg.m-2)", "Standard deviation inter-model"))
+
+```
+
+
+In a similar way than the carbon stocked, the total biomass removed by harvest increases with the degree of human intervention in the scenario. This is consistent with the way the scenarios were built and validates the willingness of effort that was involved in the scenarios.
+
+```{r mort5, message=F, warning=F, echo=FALSE, fig.cap="Evolution of mortality due to disturbancies on different scenarios"}
+
+
+ggplot(Mortality_AggT, aes(x=Time, y=MortalityMean, col=Disturbance, group=Disturbance)) +
+  geom_line()+
+  geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
+  xlab("Time (years)") +
+  ylab("Mortality in biomass(Mg.m-2)") +
+  coord_cartesian(ylim=c(-500, 1750)) +
+  ggtitle("Evolution of mortality due to disturbancies on different scenarios") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  facet_wrap(~Scenario, ncol=1)
+
+```
+
+Biomass harvested wis constant against time for the adaptability scenario, while it increases for the others. This reflects the previous observation, showing that maintaining a business as usual management or implementing a proactive one will lead to an increasing amount of efforts to maintain the management harvest goals.
+
+### III.a.2) Insects
+
+```{r InsectComp, echo=FALSE, fig.cap="Insect outbreak by scenario"}
+
+ggplot(Mortality_Agg[Mortality_Agg$Disturbance=="Insects",], aes(x=Scenario, y=MortalityMean, fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
+ylab("Biomass killed (Mg.m-2)") +
+ggtitle("Insect outbreak by scenario") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r insectstest, echo=FALSE}
+
+kable(as.data.frame(Mortality_Agg[Mortality_Agg$Disturbance == "Insects",]),
+      caption = "Insect mortality depending on the scenario",
+      col.names = c("Disturbance", "Scenario", "Mean mortality (Mg.m-2)", "Standard deviation inter-model"))
+
+```
+
+Concerning insect outbreaks, the Pro-active scenario shows mortality around 3194 Mg/m² compared to the 1840 Mg/m² and 2071 Mg/m² of respectively the Adaptability and BAU scenarios. The standard deviation bars of these two last scenarios are totally overlaid so BAU and Adaptability scenarios seem to have the same effect on insect behavior. The Pro-active scenario should not to be used if facing insect outbreaks is a priority.
+
+
+### III.a.3) Fire
+
+There is no prescribed fire setted on the SCRPPLE extention, so accidental and natural fires are the only types of fire.
+
+  i) Accidental
+
+```{r FireAcplot, echo=FALSE, fig.cap="Biomass burned by human activity by scenario"}
+
+ggplot(Mortality_Agg[Mortality_Agg$Disturbance=="Fire accidental",], aes(x=Scenario, y=MortalityMean, fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
+ylab("Biomass burned (Mg.m-2)") +
+ggtitle("Biomass burned by human activity by scenario") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r FireAc1, echo=FALSE}
+kable(as.data.frame(Mortality_Agg[Mortality_Agg$Disturbance == "Fire accidental",]),
+      caption = "Accidental fire mortality depending on the scenario",
+      col.names = c("Disturbance", "Scenario", "Mean mortality (Mg.m-2)", "Standard deviation inter-model"))
+```
+
+
+
+  ii) Natural
+
+```{r FireNat1, echo=FALSE, fig.cap="Biomass burned naturally by scenario"}
+ggplot(Mortality_Agg[Mortality_Agg$Disturbance=="Fire lightning",], aes(x=Scenario, y=MortalityMean, fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=MortalityMean-MortalitySd, ymax=MortalityMean+MortalitySd)) +
+ylab("Biomass burned (Mg.m-2)") +
+ggtitle("Biomass burned naturally by scenario") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r fireNat2, echo=FALSE}
+
+kable(as.data.frame(Mortality_Agg[Mortality_Agg$Disturbance == "Fire lightning",]),
+      caption = "Natural fire mortality depending on the scenario",
+      col.names = c("Disturbance", "Scenario", "Mean mortality (Mg.m-2)", "Standard deviation inter-model"))
+
+```
+
+Burned biomass is similar between the adaptability and the BAU scenario (respectively 12050 and 11455 Mg/m²). The Pro-active scenario in contrast leads to an important amount of burned biomass (17701 Mg/m²).
+
+
+## III.b) Spatial distribution of the fires
+
+To see where this increased amount of fires appears, the fire intensity (approched by the biomass burned) and fire frequency (approched by the number of years with fires).
+
+### III.b.1) Data preparation
+
+The method is explained below. All the obtained layers are first stocked on different RasterStacks. The Quantity of biomass burned in *RasterStack_Burn*, the number of years with at least a finre in *RasterStack_AllF* for all types of fire, in *RasterStack_AccF* for accidental fires and in *RasterStack_NatF* for natural ones.
+
+```{r fire}
+
+# Raster of zeros with the proper definition and extent
+Zero = paste0(BAU_input, "..1/scrapple-fire/flaming-consumptions-1.img") %>% raster()
+Zero[Zero != 0] = 0
+
+# Empty sets where the information will be stacked
+RasterStack_Burn = stack()
+RasterStack_AllF = stack()
+RasterStack_AccF = stack()
+RasterStack_NatF = stack()
+
+for(j in c(1,2)){
+  
+  if(j == 1) { run = "..1"
+  } else { run = "..2"}
+  
+  for(scenario in ListScenario){
+  # When changing a scenario, the input file change
+  # and the total burned and frequency scenarios are initialised to 0
+    if(scenario == "Business as usual") {
+      Input = BAU_input
+      TotBurn = Zero
+      FreqAllT = Zero
+      FreqAcc = Zero
+      FreqNat = Zero
+    } else if(scenario == "Adaptability"){
+      Input = Adapty_input
+      TotBurn = Zero
+      TotBurn = Zero
+      FreqAllT = Zero
+      FreqAcc = Zero
+      FreqNat = Zero
+    } else {
+      Input = ProAct_input
+      TotBurn = Zero
+      TotBurn = Zero
+      FreqAllT = Zero
+      FreqAcc = Zero
+      FreqNat = Zero}
+  
+    for (i in 1:100) {
+      # The total burned biomass is the biomass burned the previous years
+      # added to the flaming and smolder consumptions of the ongoing year
+      Raster_fc = paste0(Input, run, "/scrapple-fire/flaming-consumptions-",i,".img") %>%
+        raster()
+      Raster_sm = paste0(Input, run, "/scrapple-fire/smolder-consumption-",i,".img") %>%
+        raster()
+      RasterBurn = (Raster_fc + Raster_sm)  %>% multiply_by(10^-6)
+      TotBurn = TotBurn + RasterBurn
+    
+      Raster_FT = paste0(Input, run, "/scrapple-fire/ignition-type-",i,".img") %>%
+        raster()
+      Raster_FT[Raster_FT == 1] = 0 # the unburned area (map code 1) is not considered here
+    
+      # The sum of all types of fires is the zones where a fire append the previous years
+      # (all the types of fire takes the map code 1), added to the zones of the ongoing year
+      Raster_AllT = Raster_FT
+      Raster_AllT[Raster_AllT != 0] = 1
+      FreqAllT = FreqAllT + Raster_AllT
+    
+      # The same is done with accidental fires
+      # (initial map code 2 turned to 1, all the rest 0)
+      Raster_Acc = Raster_FT
+      Raster_Acc[Raster_Acc == 2] = 1
+      Raster_Acc[Raster_Acc != 1] = 0
+      FreqAcc = FreqAcc + Raster_Acc
+    
+      # Idem with natural fires
+      Raster_Nat = Raster_FT
+      Raster_Nat[Raster_Nat == 3] = 1
+      Raster_Nat[Raster_Nat != 1] = 0
+      FreqNat = FreqNat + Raster_Nat   
+    
+      if(i==100){
+      
+        # The total after the 100 years of run is saved
+        TotBurn[TotBurn == 0] = NA
+        names(TotBurn) = paste0(scenario, run)
+        RasterStack_Burn = stack(RasterStack_Burn, TotBurn)
+      
+        FreqAllT[FreqAllT == 0] = NA
+        FreqAllT = FreqAllT
+        names(FreqAllT) = paste0(scenario, run)
+        RasterStack_AllF = stack(RasterStack_AllF, FreqAllT)
+      
+        FreqAcc[FreqAcc == 0] = NA
+        FreqAcc = FreqAcc
+        names(FreqAcc) = paste0(scenario, run)
+        RasterStack_AccF = stack(RasterStack_AccF, FreqAcc)
+      
+        FreqNat[FreqNat == 0] = NA
+        FreqNat = FreqNat
+        names(FreqNat) = paste0(scenario, run)
+        RasterStack_NatF = stack(RasterStack_NatF, FreqNat)
+      
+      }
+        }
+  }
+}
+  
+```
+
+### III.b.2) Biomass burned
+
+The results of the two simulations of a same scenarios are stacked together.
+
+```{r stackrun}
+
+BAU_Burn = stack(RasterStack_Burn$Business.as.usual..1,
+                 RasterStack_Burn$Business.as.usual..2)
+Adapty_Burn = stack(RasterStack_Burn$Adaptability..1, RasterStack_Burn$Adaptability..2)
+ProAct_Burn = stack(RasterStack_Burn$Pro.Active..1, RasterStack_Burn$Pro.Active..2)
+
+```
+
+Mean and stadard deviation calculations are adapted to raster layers.
+
+```{r calc0}
+BAU_BurnMean = calc(BAU_Burn, fun = mean)
+names(BAU_BurnMean) = "Business As Usual"
+
+BAU_BurnSd = calc(BAU_Burn, fun = sd) %>% multiply_by(InvBessel)
+names(BAU_BurnSd) = "Business As Usual"
+
+
+Adapty_BurnMean = calc(Adapty_Burn, fun = mean)
+names(Adapty_BurnMean) = "Adaptability"
+
+Adapty_BurnSd = calc(Adapty_Burn, fun = sd) %>% multiply_by(InvBessel)
+names(Adapty_BurnSd) = "Adaptability"
+
+
+ProAct_BurnMean = calc(ProAct_Burn, fun = mean)
+names(ProAct_BurnMean) = "Pro-Active"
+
+ProAct_BurnSd = calc(Adapty_Burn, fun = mean) %>% multiply_by(InvBessel)
+names(ProAct_BurnSd) = "Pro-Active"
+
+```
+
+To be able to compare the rasters, they are plotted using the same legend. This legend is calculated using the maximum and minimum values of all three rasters. In the present document, the breaks are choosen arbitrarily some elements are overlaping (legend, label and plots).
+When the layers bring important information concerning the objective of the study, they are exported to be properly presented with the software Qgis. Legends are then builded using the following method: first, a visualisation of the BAU scenario (used as a referency) is realised using the equal intervals setting. This option as it allows to identify localised extreme values unlike a visualisation by quantiles. By testing, I found that 6 intervals allows to see the interesting information without overloading the map. The breaks obtained are rouded for a better lengend visibility. This breaks are then used for the others scenarios, making comparison of maps also possible.
+
+```{r BurnM, fig.cap="Total burned biomass by scenario"}
+
+VarStack = stack(BAU_BurnMean, Adapty_BurnMean, ProAct_BurnMean)
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.01)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.3(nbrks), legend = F,
+      main=names(VarStack),zlim=c(Min,Max),)
+plot(rasTot, legend.only=TRUE, col=pal.3(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text="Burned biomass (Mg.m-2)",
+                    side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+An important amount of biomass burned is observed on the southwestern part of the Klamath region. This behavior is hard to explain.
+
+```{r BurnSd, fig.cap="Standard deviation of Burned biomass by scenario"}
+
+VarStack = stack(BAU_BurnSd, Adapty_BurnSd, ProAct_BurnSd)
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.01)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.sd(nbrks), legend = F,
+      main=names(VarStack),zlim=c(Min,Max),)
+plot(rasTot, legend.only=TRUE, col=pal.sd(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text="Standard error on burned biomass (Mg.m-2)",
+                    side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+Variability is important, but mostly concentrated in the curious southwestern part of the Klamath region.
+
+### III.b.3) Number of years with fires
+
+ToThe number of years with at least a fire is ploted for each cell. The sames operations than before are done to determine mean values and their standard deviation an for plotting them. The corresponding code is not shown to avoid redundancy.
+
+```{r stackallf, echo=F}
+
+BAU_AllF = stack(RasterStack_AllF$Business.as.usual..1, RasterStack_AllF$Business.as.usual..2)
+Adapty_AllF = stack(RasterStack_AllF$Adaptability..1, RasterStack_AllF$Adaptability..2)
+ProAct_AllF = stack(RasterStack_AllF$Pro.Active..1, RasterStack_AllF$Pro.Active..2)
+
+BAU_AccF = stack(RasterStack_AccF$Business.as.usual..1, RasterStack_AccF$Business.as.usual..2)
+Adapty_AccF = stack(RasterStack_AccF$Adaptability..1, RasterStack_AccF$Adaptability..2)
+ProAct_AccF = stack(RasterStack_AccF$Pro.Active..1, RasterStack_AccF$Pro.Active..2)
+
+BAU_NatF = stack(RasterStack_NatF$Business.as.usual..1, RasterStack_NatF$Business.as.usual..2)
+Adapty_NatF = stack(RasterStack_NatF$Adaptability..1, RasterStack_NatF$Adaptability..2)
+ProAct_NatF = stack(RasterStack_NatF$Pro.Active..1, RasterStack_NatF$Pro.Active..2)
+
+```
+
+  i) All types of fires
+
+```{r calc1, echo=F}
+
+BAU_AllFMean = calc(BAU_AllF, fun = mean)
+names(BAU_AllFMean) = "Business as usual"
+
+BAU_AllFSd = calc(BAU_AllF, fun = sd) %>% multiply_by(InvBessel)
+names(BAU_AllFSd) = "Business As Usual"
+
+
+Adapty_AllFMean = calc(Adapty_AllF, fun = mean)
+names(Adapty_AllFMean) = "Adaptability"
+
+Adapty_AllFSd = calc(Adapty_AllF, fun = sd) %>% multiply_by(InvBessel)
+names(Adapty_AllFSd) = "Adaptability"
+
+
+ProAct_AllFMean = calc(ProAct_AllF, fun = mean)
+names(ProAct_AllFMean) = "Pro-Active"
+
+ProAct_AllFSd = calc(ProAct_AllF, fun = sd) %>% multiply_by(InvBessel)
+names(ProAct_AllFSd) = "Pro-Active"
+
+```
+
+```{r type1, echo=FALSE, fig.cap= "Number of fire years by scenario"}
+
+VarStack = stack(BAU_AllFMean, Adapty_AllFMean, ProAct_AllFMean)
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+  
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.3(nbrks), legend = F, zlim=c(Min,Max))
+plot(rasTot, legend.only=TRUE, col=pal.3(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text="Number of years with at least one fire",
+                     side=4, font=2, line=2.5, cex=0.8))
+```
+
+If the southwestern part still have unespected and unexplained intense fire frequency, the northestern part shows more interesting variations of frequency beween the scenarios. To have more detail, the 
+
+```{r type1sd, echo=FALSE, fig.cap="Standard deviation in fire years"}
+
+VarStack = stack(BAU_AllFSd, Adapty_AllFSd, ProAct_AllFSd)
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+  
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.sd(nbrks), legend = F, zlim=c(Min,Max))
+plot(rasTot, legend.only=TRUE, col=pal.sd(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text="Variability on the number of years with at least one fire",
+                     side=4, font=2, line=2.5, cex=0.8))
+```
+
+Variability seems equally distributed, except for the southwestern part of the map.
+For more detail, the same plots are done for natural and accidental fires.
+
+  ii) Fires initiated by humans
+  
+```{r calc2, echo=FALSE}
+
+BAU_AccFMean = calc(BAU_AccF, fun = mean)
+names(BAU_AccFMean) = "Business as usual"
+
+BAU_AccFSd = calc(BAU_AccF, fun = sd) %>% multiply_by(InvBessel)
+names(BAU_AccFSd) = "Business As Usual"
+
+
+Adapty_AccFMean = calc(Adapty_AccF, fun = mean)
+names(Adapty_AccFMean) = "Adaptability"
+
+Adapty_AccFSd = calc(Adapty_AccF, fun = sd) %>% multiply_by(InvBessel)
+names(Adapty_AccFSd) = "Adaptability"
+
+
+ProAct_AccFMean = calc(ProAct_AccF, fun = mean)
+names(ProAct_AccFMean) = "Pro-Active"
+
+ProAct_AccFSd = calc(ProAct_AccF, fun = sd) %>% multiply_by(InvBessel)
+names(ProAct_AccFSd) = "Pro-Active"
+
+```
+
+
+```{r type2, echo=FALSE, fig.cap="Number of accidental fire years by scenario"}
+
+VarStack = stack(BAU_AccFMean, Adapty_AccFMean, ProAct_AccFMean)
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.3(nbrks), legend = F, zlim=c(Min,Max))
+plot(rasTot, legend.only=TRUE, col=pal.3(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text="Number of years with accidental fire",
+                     side=4, font=2, line=2.5, cex=0.8))
+```
+
+```{r type2sd, echo=FALSE, fig.cap="Standard deviation on accidental fire years"}
+
+VarStack = stack(BAU_AccFSd, Adapty_AccFSd, ProAct_AccFSd)
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.sd(nbrks), legend = F, zlim=c(Min,Max))
+plot(rasTot, legend.only=TRUE, col=pal.sd(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text="Number of years with accidental fire",
+                     side=4, font=2, line=2.5, cex=0.8))
+```
+
+  iii) Fires initiated by lightning
+
+```{r calc3, echo=FALSE}
+
+BAU_NatFMean = calc(BAU_NatF, fun = mean)
+names(BAU_NatFMean) = "Business as usual"
+
+BAU_NatFSd = calc(BAU_NatF, fun = sd) %>% multiply_by(InvBessel)
+names(BAU_NatFSd) = "Business As Usual"
+
+
+Adapty_NatFMean = calc(Adapty_NatF, fun = mean)
+names(Adapty_NatFMean) = "Adaptability"
+
+Adapty_NatFSd = calc(Adapty_NatF, fun = sd) %>% multiply_by(InvBessel)
+names(Adapty_NatFSd) = "Adaptability"
+
+
+ProAct_NatFMean = calc(ProAct_NatF, fun = mean)
+names(ProAct_NatFMean) = "Pro-Active"
+
+ProAct_NatFSd = calc(ProAct_NatF, fun = sd) %>% multiply_by(InvBessel)
+names(ProAct_NatFSd) = "Pro-Active"
+
+```
+
+```{r type3, message=F, warning=F, echo=FALSE, fig.cap="Number of natural fire years by scenario"}
+
+VarStack = stack(BAU_NatFMean, Adapty_NatFMean, ProAct_NatFMean)
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.3(nbrks), legend = F, zlim=c(Min,Max))
+plot(rasTot, legend.only=TRUE, col=pal.3(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text="Proportion of years with natural fire",
+                     side=4, font=2, line=2.5, cex=0.8))
+for(i in (1:3)){
+  export = raster(vals=getValues(VarStack[[i]]),
+                    nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
+                    xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
+  writeRaster(export,
+    filename =  paste0("D:/Internship 3A/Rasters/Fire/",names(VarStack[[i]]),".tif"),
+    format = "GTiff", datatype ="FLT4S",overwrite=T)
+}
+
+```
+
+```{r type3sd, message=F, warning=F, echo=FALSE, fig.cap="Standard deviation on accidental fire years"}
+
+VarStack = stack(BAU_NatFSd, Adapty_NatFSd, ProAct_NatFSd)
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.sd(nbrks), legend = F, zlim=c(Min,Max))
+plot(rasTot, legend.only=TRUE, col=pal.sd(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text="Proportion of years with natural fire",
+                     side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+The unexplained fire behavior of the southwestern part of the map seems to be originated by the simulation of accidental fires. As this can be due to an error of modeling (according to the expert Dr.Robert Scheller) and need further verification before interpretation, only natural fires are then analized. There is an increase in the North East of the Klamath region that isn’t observed for the other scenarios. This zone doesn’t correspond to the Resistance prescription, so the important frequency of fires is explained by the plantations. This result shows that, despite efforts of management for fire risk, intense plantations can lead to an increase of fires, and that may waste investments.
+
+
+# VI. Forest sustainability and biodiverity
+
+## VI.a) Sustaiability of the forest
+
+The biomass and forest cover results are computed at the same time. Rasters concerning shrubs biomass are imported for the year 0 and 100 and added together (respectively *Shrub0* and *Shrub100*). The total biomass, *i.e.* the biomass of all species, is also imported (*BMTot0* and *BMTot100*). The biomass evolution is obtained by making the difference between the initial and final biomass. For the forest cover, the operation is done by the equation 3.
+
+Equation 3:
+$$\begin{aligned}
+\Delta FC_{i} & = FC_{100,i} - FC_{0,i}\\
+\Longleftrightarrow\Delta FC_{i} & = 100\left(1-{\displaystyle \frac{BMs_{100,i}}{BM_{100,i}}}\right) - 100\left(1-{\displaystyle \frac{BMs_{0,i}}{BM_{0,i}}}\right)\\
+\end{aligned}$$
+
+With:
+
+* $\Delta FC_{i}$ the forest cover evalution for the scenario $i \in [Business as usual, Adaptability, Proactive]$. It corespond to the evolution of the proportion of trees on the biomass (in percentage).
+* $FC_{100,i}$ and $FC_{0,i}$ respectively the final and initial forest cover for the scenario $i$.
+* $BMs_{100,i}$ and $BMs_{0,i}$ respectively the final and initial biomass of shrubs for the scenario $i$.
+* $BM_{100,i}$ and $BM_{0,i}$ respectively the final and initial total biomass (shrubs and trees) for the scenario $i$.
+
+```{r BMTot}
+
+StackCovDif = stack()
+StackBM0 = stack()
+StackBM100 = stack()
+StackBMdiff = stack()
+
+for(j in c(1,2)){
+  if(j == 1) { run = "..1"
+  } else { run = "..2"}
+
+  for(scenario in ListScenario){
+    
+    if(scenario == "Business as usual") {Input = paste0(BAU_input,run,"/biomass/")
+    } else if(scenario == "Adaptability"){Input = paste0(Adapty_input,run,"/biomass/")
+    } else {Input = paste0(ProAct_input,run,"/biomass/")}
+
+    FxR0 = paste0(Input,"FX_R_SEED-0.tif") %>% raster() %>% multiply_by(10^-6)
+    FxR100 = paste0(Input,"FX_R_SEED-100.tif") %>% raster() %>% multiply_by(10^-6)
+
+    NFxR0 = paste0(Input,"NOFX_R_SEED-0.tif") %>% raster() %>% multiply_by(10^-6)
+    NFxR100 = paste0(Input,"NoFX_R_SEED-100.tif") %>% raster() %>% multiply_by(10^-6)
+
+    NFxNR0 = paste0(Input,"NOFX_NOR_SEED-0.tif") %>% raster() %>% multiply_by(10^-6)
+    NFxNR100 = paste0(Input,"NoFX_NOR_SEED-100.tif") %>% raster() %>% multiply_by(10^-6)
+
+    Shrub0 = FxR0 + NFxR0 + NFxNR0
+    Shrub100 = FxR100 + NFxR100 + NFxNR100
+
+    BMTot0 = paste0(Input,"TotalBiomass-0.tif") %>% raster() %>% multiply_by(10^-6)
+    BMTot100 = paste0(Input,"TotalBiomass-100.tif") %>% raster() %>% multiply_by(10^-6)
+  
+    BMTot0[BMTot0 >= 300000] = NA
+  
+    BMdiff = BMTot100-BMTot0
+  
+    BMTot0[BMTot0 == 0] = NA
+    BMTot100[BMTot100 == 0] = NA
+    BMdiff[BMdiff == 0] = NA
+  
+    Covert0 = 1-(Shrub0/BMTot0)
+    Covert100 = 1-(Shrub100/BMTot100)
+
+    CovDif = (Covert100-Covert0)*100
+    
+    names(CovDif) = paste0(scenario,run)
+    StackCovDif = addLayer(StackCovDif, CovDif)
+    
+    names(BMTot0) = paste0(scenario,run)
+    names(BMTot100) = paste0(scenario,run)
+    names(BMdiff) = paste0(scenario,run)
+    
+    StackBM0 = addLayer(StackBM0, BMTot0)
+    StackBM100 = addLayer(StackBM100, BMTot100)
+    StackBMdiff = addLayer(StackBMdiff, BMdiff)
+
+  }
+}
+
+```
+
+### VI.a.1) Repartition of the biomass
+
+```{r stackrun2, echo=FALSE}
+
+BAU_BM0 = stack(StackBM0$Business.as.usual..1, StackBM0$Business.as.usual..2)
+
+BAU_BM100 = stack(StackBM100$Business.as.usual..1, StackBM100$Business.as.usual..2)
+Adapty_BM100 = stack(StackBM100$Adaptability..1, StackBM100$Adaptability..2)
+ProAct_BM100 = stack(StackBM100$Pro.Active..1, StackBM100$Pro.Active..2)
+
+BAU_BMdiff = stack(StackBMdiff$Business.as.usual..1, StackBMdiff$Business.as.usual..2)
+Adapty_BMdiff = stack(StackBMdiff$Adaptability..1, StackBMdiff$Adaptability..2)
+ProAct_BMdiff = stack(StackBMdiff$Pro.Active..1, StackBMdiff$Pro.Active..2)
+
+```
+
+
+```{r calc4, echo=FALSE}
+
+BAU_BM0Mean = calc(BAU_BM0, fun = mean)
+names(BAU_BM0Mean) = "Initial situation"
+
+#####
+
+BAU_BM100Mean = calc(BAU_BM100, fun = mean)
+names(BAU_BM100Mean) = "Business As Usual"
+
+BAU_BM100Sd = calc(BAU_BM100, fun = sd) %>% multiply_by(InvBessel)
+names(BAU_BM100Sd) = "Business As Usual"
+
+
+Adapty_BM100Mean = calc(Adapty_BM100, fun = mean)
+names(Adapty_BM100Mean) = "Adaptability"
+
+Adapty_BM100Sd = calc(Adapty_BM100, fun = sd) %>% multiply_by(InvBessel)
+names(Adapty_BM100Sd) = "Adaptability"
+
+
+ProAct_BM100Mean = calc(ProAct_BM100, fun = mean)
+names(ProAct_BM100Mean) = "Pro-Active"
+
+ProAct_BM100Sd = calc(Adapty_BM100, fun = sd) %>% multiply_by(InvBessel)
+names(ProAct_BM100Sd) = "Pro-Active"
+
+#####
+
+BAU_diffMean = calc(BAU_BMdiff, fun = mean)
+names(BAU_diffMean) = "Business As Usual"
+
+#BAU_diffSd = calc(BAU_BMdiff, fun = sd) %>% multiply_by(InvBessel)
+#names(BAU_diffSd) = "Business As Usual"
+
+
+Adapty_diffMean = calc(Adapty_BMdiff, fun = mean)
+names(Adapty_diffMean) = "Adaptability"
+
+#Adapty_diffSd = calc(Adapty_BMdiff, fun = sd) %>% multiply_by(InvBessel)
+#names(Adapty_diffSd) = "Adaptability"
+
+
+ProAct_diffMean = calc(ProAct_BMdiff, fun = mean)
+names(ProAct_diffMean) = "Pro-Active"
+
+#ProAct_diffSd = calc(ProAct_BMdiff, fun = sd) %>% multiply_by(InvBessel)
+#names(ProAct_diffSd) = "Pro-Active"
+
+```
+
+Standard deviation of the diference in biomass is not calculated, as the known formula $s = \sqrt(s_{a}^2+s_{b}^2)$ is valid only for independent measures.
+
+```{r BM100plot, message=F, warning=F, echo=FALSE, fig.cap="Above ground live biomass by scenario after 100 years"}
+
+VarStack = stack(BAU_BM0Mean, BAU_BM100Mean, Adapty_BM100Mean, ProAct_BM100Mean)
+  Title = "Total biomass (Mg.m-2)"
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.01)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.3(nbrks), legend = F, zlim=c(Min,Max), 
+main = names(VarStack))
+plot(rasTot, legend.only=TRUE, col=pal.3(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text=Title, side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+The total biomass seems to evolve similarly on the scenarios. To verify that, the difference in bimass is plotted.
+
+```{r BMplot1, message=F, warning=F, echo=FALSE, fig.cap="Evolution of above ground live biomass by scenario"}
+
+VarStack = stack(BAU_diffMean, Adapty_diffMean, ProAct_diffMean)
+  Title = "Difference on Biomass (Mg.m-2)"
+  Min = -0.13
+  Max = 0.13
+  brks = c(-0.13, -0.08,-0.04, 0, 0.04, 0.08,0.13)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.dif(nbrks), legend = F, zlim=c(Min,Max), 
+main = names(VarStack))
+plot(rasTot, legend.only=TRUE, breaks=brks, col=pal.dif(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text=Title, side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+The patterns of biomass evolution seems similar. The great losses of the soutwest reflect the frequent and intese fires observed previously.
+
+### VI.a.2) Evolution of the forest cover
+
+```{r stackruncov, echo=FALSE}
+
+BAU_CovDif = stack(StackCovDif$Business.as.usual..1, StackCovDif$Business.as.usual..2)
+BAU_CovDif_df = as.data.frame(cellStats(BAU_CovDif,stat=mean))
+BAU_CovDif_df$scenario = "Business as usual"
+
+Adapty_CovDif = stack(StackCovDif$Adaptability..1, StackCovDif$Adaptability..2)
+Adapty_CovDif_df = as.data.frame(cellStats(Adapty_CovDif,stat=mean))
+Adapty_CovDif_df$scenario = "Adaptability"
+
+ProAct_CovDif = stack(StackCovDif$Pro.Active..1, StackCovDif$Pro.Active..2)
+ProAct_CovDif_df = as.data.frame(cellStats(ProAct_CovDif,stat=mean))
+Adapty_CovDif_df$scenario = "Pro-Active"
+
+```
+
+```{r covdfcalc, echo=FALSE, fig.cap="Evolution of forest cover by scenario"}
+
+CovDif_df = data.frame(mean(BAU_CovDif_df[,1]), sd(BAU_CovDif_df[,1]), "Business as usual")
+
+CovDif_df = rbind(CovDif_df, c(mean(Adapty_CovDif_df[,1]), sd(Adapty_CovDif_df[,1]), "Adaptability"))
+
+CovDif_df = rbind(CovDif_df, c(mean(ProAct_CovDif_df[,1]), sd(ProAct_CovDif_df[,1]), "Pro-active"))
+
+colnames(CovDif_df) = c("mean", "sd", "Scenario")
+
+CovDif_df$mean = as.numeric(CovDif_df$mean)
+CovDif_df$sd = as.numeric(CovDif_df$sd)
+
+ggplot(CovDif_df, aes(x=Scenario, y=mean, fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd)) +
+ylab("Increase in forest cover proportion (%)") +
+ggtitle("Evolution of forest cover by scenario") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+The evolution in the proportion of trees on the biomass (here as a percentage) shows a decline in forest cover, meaning that none of the scenarios are able to tackle the increase of shrub biomass against trees. This value is outstandingly low for the Adaptability scenario, with a decrease of 19% of the biomass of trees over the total biomass. The BAU and Pro-active scenarios are both around 8%. This is surprising, as it would have been expected that the intense tree planting of the Pro-active scenario would increase the proportion of trees. This result shows that letting natural regeneration (Adaptability) is not a suitable way of regeneration in the Klamath region, as it will lead to an important domination of shrubs. They also show that intensive planting (Pro-active) is neither a solution, as the gain compared to moderate planting (BAU) is neglectable.
+
+
+```{r covdfcalc2, echo=FALSE}
+
+kable(as.data.frame(CovDif_df), caption = "Increase in trees on the total biomass (%)")
+
+```
+
+
+```{r calccov0, echo=FALSE}
+
+
+BAU_CovDifMean = calc(BAU_CovDif, fun = mean)
+names(BAU_CovDifMean) = "Business As Usual"
+
+BAU_CovDifSd = calc(BAU_CovDif, fun = sd) %>% multiply_by(InvBessel)
+names(BAU_CovDifSd) = "Business As Usual"
+
+
+Adapty_CovDifMean = calc(Adapty_CovDif, fun = mean)
+names(Adapty_CovDifMean) = "Adaptability"
+
+Adapty_CovDifSd = calc(Adapty_CovDif, fun = sd) %>% multiply_by(InvBessel)
+names(Adapty_CovDifSd) = "Adaptability"
+
+
+ProAct_CovDifMean = calc(ProAct_CovDif, fun = mean)
+names(ProAct_CovDifMean) = "Pro-Active"
+
+ProAct_CovDifSd = calc(Adapty_CovDif, fun = sd) %>% multiply_by(InvBessel)
+names(ProAct_CovDifSd) = "Pro-Active"
+
+
+
+```
+
+
+```{r plotcov, echo=FALSE, fig.cap="Evolution of the proportion of trees by scenario"}
+VarStack = stack(BAU_CovDifMean, Adapty_CovDifMean, ProAct_CovDifMean)
+  Title = "Evolution of trees on the total biomass"
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = c(-100,-50,0,50,100)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 1.1, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.dif(nbrks), legend = F, zlim=c(Min,Max), 
+    main = names(VarStack))
+plot(rasTot, legend.only=TRUE, breaks=brks, col=pal.dif(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text=Title, side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+
+### VI.a.2) Regeneration
+
+```{r repro1}
+
+Rege = data.frame()
+
+for(j in c(1,2)){
+  
+  if(j == 1) { run = "..1"
+  } else { run = "..2"}
+
+  for(scenario in ListScenario){
+    
+    if(scenario == "Business as usual") {Input = BAU_input
+    } else if(scenario == "Adaptability"){Input = Adapty_input
+    } else {Input = ProAct_input}
+    
+    Reprolog = paste0(Input, run, "/NECN-reproduction-log.csv") %>% read.csv()
+    Reprolog$NbEvents = Reprolog$NumCohortsPlanting + Reprolog$NumCohortsSerotiny +
+                             Reprolog$NumCohortsResprout + Reprolog$NumCohortsSeed
+    Repro = cbind(Reprolog$Time, Reprolog$NbEvents) %>% as.data.frame()
+    colnames(Repro) = c("Time", "NbEvents")
+    Repro$Scenario = scenario
+    Repro$Run = j
+    
+    Rege = rbind(Rege,Repro)
+  }
+}
+
+Rege$NbEvents = Rege$NbEvents %>% as.character() %>% as.numeric()
+
+```
+
+
+```{r repro2, message=FALSE, warning=FALSE, echo=F}
+
+Rege_Sum = Rege %>% group_by(Scenario, Run) %>%
+      summarise(NbEventsTot = sum(NbEvents))
+
+Rege_Agg = Rege_Sum %>% group_by(Scenario) %>%
+      summarise(NbEventsMean = mean(NbEventsTot), NbEventsSd = sd(NbEventsTot)*InvBessel)
+
+```
+
+```{r repro3, message=FALSE, warning=FALSE, echo=F}
+
+Rege_AggT = Rege %>% group_by(Time, Scenario) %>%
+      summarise(NbEventsMean = mean(NbEvents), NbEventsSd = sd(NbEvents)*InvBessel)
+
+```
+
+```{r repro4, echo=FALSE, fig.cap="Total number of reproduction events by scenario", echo=F}
+
+ggplot(Rege_Agg, aes(x=Scenario, y=NbEventsMean, fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=NbEventsMean-NbEventsSd, ymax=NbEventsMean+NbEventsSd)) +
+ylab("Total number of reproduction event") +
+ggtitle("Total number of reproduction events by scenario") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r repro5, echo=F}
+
+kable(as.data.frame(Rege_Agg),
+      caption = "Total number of reproduction events by scenario")
+
+```
+
+The number of reproductive events follows what would have been expected. Indeed, planting is taken into account and the number of events for Pro-active (more than $137.10^6$) is superior to BAU ($38.10^6$) itself superior to Adaptability ($30.10^6$).
+
+```{r repro6, echo=F}
+
+Rege = data.frame()
+
+for(j in c(1,2)){
+  
+  if(j == 1) { run = "..1"
+  } else { run = "..2"}
+
+  for(scenario in ListScenario){
+    
+    if(scenario == "Business as usual") {Input = BAU_input
+    } else if(scenario == "Adaptability"){Input = Adapty_input
+    } else {Input = ProAct_input}
+    
+    Reprolog = paste0(Input, run, "/NECN-reproduction-log.csv") %>% read.csv()
+    Reprolog$NbEvents = Reprolog$NumCohortsSerotiny +
+                             Reprolog$NumCohortsResprout + Reprolog$NumCohortsSeed
+    Repro = cbind(Reprolog$Time, Reprolog$NbEvents) %>% as.data.frame()
+    colnames(Repro) = c("Time", "NbEvents")
+    Repro$Scenario = scenario
+    Repro$Run = j
+    
+    Rege = rbind(Rege,Repro)
+  }
+}
+
+Rege$NbEvents = Rege$NbEvents %>% as.character() %>% as.numeric()
+
+```
+
+```{r repro7, message=FALSE, warning=FALSE, echo=F}
+
+Rege_Sum = Rege %>% group_by(Scenario, Run) %>%
+      summarise(NbEventsTot = sum(NbEvents))
+
+Rege_Agg = Rege_Sum %>% group_by(Scenario) %>%
+      summarise(NbEventsMean = mean(NbEventsTot), NbEventsSd = sd(NbEventsTot)*InvBessel)
+
+```
+
+```{r repro8, message=FALSE, warning=FALSE, echo=F}
+
+Rege_AggT = Rege %>% group_by(Time, Scenario) %>%
+      summarise(NbEventsMean = mean(NbEvents), NbEventsSd = sd(NbEvents)*InvBessel)
+
+```
+
+```{r repro9, echo=FALSE, fig.cap="Total number of reproduction events by scenario"}
+
+ggplot(Rege_Agg, aes(x=Scenario, y=NbEventsMean, fill=Scenario)) +
+geom_bar(stat="identity") +
+geom_errorbar(aes(ymin=NbEventsMean-NbEventsSd, ymax=NbEventsMean+NbEventsSd)) +
+ylab("Total number of reproduction event (without planting)") +
+ggtitle("Total number of reproduction events by scenario") +
+theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r repro10, echo=F}
+
+kable(as.data.frame(Rege_Agg),
+      caption = "Total number of reproduction event (without planting)")
+
+```
+
+Without taking in account planting, the results are similar to each other, with a slight superior value for the adaptability scenario. This light difference demonstrates that by planting (intensively or moderately alike) no consequent competition is done to the other forms of regeneration. Even if competition happens later in the growth process, the genetic variability that would have happened with seeding, and the advantages of sprouting and scerotiny are kept. 
+
+## IV.b) Biodiverity on the forest
+
+To measure biodiverity, species and age richness is analysed. All 10 years, the total species richness and age richness are stored on a dataframe (*Biodiv*). Initial and final maps are stored on rasterstacks.
+
+```{r biodiv1}
+
+
+Biodiv = c("Year", "Scenario", "Spp_Rich", "Age_Richness", "Run")
+
+StackSR0 = stack()
+StackSR100 = stack()
+
+StackAR0 = stack()
+StackAR100 = stack()
+
+for(j in c(1,2)){
+  
+  if(j == 1) { run = "..1"
+  } else { run = "..2"}
+
+for(year in seq(0, 100, by=10)){
+  for(scenario in ListScenario){
+    
+    if(scenario == "Business as usual") {Input = BAU_input
+    } else if(scenario == "Adaptability"){Input = Adapty_input
+    } else {Input = ProAct_input}
+  
+    SppRich = paste0(Input,run,"/outputs/spp-counts/SPP-RICH-",
+                       year,".img") %>% raster()
+    SppRich[SppRich == 0] = NA
+    SppRich_mean = cellStats(SppRich, stat='mean', na.rm=TRUE)
+    
+    AgeRichness = paste0(Input,run,"/outputs/age-all-spp/AGE-RICH-",
+                       year,".img") %>% raster()
+    AgeRichness[AgeRichness == 0] = NA
+    AgeRichness_mean = cellStats(AgeRichness, stat='mean', na.rm=TRUE)
+    
+    if(year == 0){
+  
+      names(SppRich) = paste0(scenario,run)
+      StackSR0 = addLayer(StackSR0, SppRich)
+      
+      names(AgeRichness) = paste0(scenario,run)
+      StackAR0 = addLayer(StackAR0, AgeRichness)
+    } else if(year == 100){
+      
+      names(SppRich) = paste0(scenario,run)
+      StackSR100 = addLayer(StackSR100, SppRich)
+      
+      names(AgeRichness) = paste0(scenario,run)
+      StackAR100 = addLayer(StackAR100, AgeRichness)
+    }
+    
+    Biodiv = rbind(Biodiv, c(year, scenario, SppRich_mean, AgeRichness_mean, run))
+    }
+  }
+}
+
+colnames(Biodiv)=Biodiv[1,] %>% unlist %>% as.character
+Biodiv=Biodiv[-1,] %>% as.data.frame()
+
+j=c(1,3,4)
+
+Biodiv[ , j] = apply(Biodiv[ , j], 2,
+                    function(x) as.numeric(as.character(x)))
+
+```
+
+```{r biodiv2, echo=F}
+
+BAU_SR0 = stack(StackSR0$Business.as.usual..1, StackSR0$Business.as.usual..2)
+
+BAU_AR0 = stack(StackAR0$Business.as.usual..1, StackAR0$Business.as.usual..2)
+
+###
+
+BAU_SR100 = stack(StackSR100$Business.as.usual..1, StackSR100$Business.as.usual..2)
+Adapty_SR100 = stack(StackSR100$Adaptability..1, StackSR100$Adaptability..2)
+ProAct_SR100 = stack(StackSR100$Pro.Active..1, StackSR100$Pro.Active..2)
+
+BAU_AR100 = stack(StackAR100$Business.as.usual..1, StackAR100$Business.as.usual..2)
+Adapty_AR100 = stack(StackAR100$Adaptability..1, StackAR100$Adaptability..2)
+ProAct_AR100 = stack(StackAR100$Pro.Active..1, StackAR100$Pro.Active..2)
+
+```
+
+
+```{r biodiv3, echo=F}
+
+BAU_SR0Mean = calc(BAU_SR0, fun = mean)
+names(BAU_SR0Mean) = "Initial situation"
+
+
+BAU_SR100Mean = calc(BAU_SR100, fun = mean)
+names(BAU_SR100Mean) = "Business As Usual"
+
+BAU_SR100Sd = calc(BAU_SR100, fun = sd) %>% multiply_by(InvBessel)
+names(BAU_SR100Sd) = "Business As Usual"
+
+
+Adapty_SR100Mean = calc(Adapty_SR100, fun = mean)
+names(Adapty_SR100Mean) = "Adaptability"
+
+Adapty_SR100Sd = calc(Adapty_SR100, fun = sd) %>% multiply_by(InvBessel)
+names(Adapty_SR100Sd) = "Adaptability"
+
+
+ProAct_SR100Mean = calc(ProAct_SR100, fun = mean)
+names(ProAct_SR100Mean) = "Pro-Active"
+
+ProAct_SR100Sd = calc(Adapty_SR100, fun = sd) %>% multiply_by(InvBessel)
+names(ProAct_SR100Sd) = "Pro-Active"
+
+###
+
+BAU_AR0Mean = calc(BAU_AR0, fun = mean)
+names(BAU_AR0Mean) = "Initial situation"
+
+
+BAU_AR100Mean = calc(BAU_AR100, fun = mean)
+names(BAU_AR100Mean) = "Business As Usual"
+
+BAU_AR100Sd = calc(BAU_AR100, fun = sd) %>% multiply_by(InvBessel)
+names(BAU_AR100Sd) = "Business As Usual"
+
+
+Adapty_AR100Mean = calc(Adapty_AR100, fun = mean)
+names(Adapty_AR100Mean) = "Adaptability"
+
+Adapty_AR100Sd = calc(Adapty_AR100, fun = sd) %>% multiply_by(InvBessel)
+names(Adapty_AR100Sd) = "Adaptability"
+
+
+ProAct_AR100Mean = calc(ProAct_AR100, fun = mean)
+names(ProAct_AR100Mean) = "Pro-Active"
+
+ProAct_AR100Sd = calc(Adapty_AR100, fun = sd) %>% multiply_by(InvBessel)
+names(ProAct_AR100Sd) = "Pro-Active"
+
+```
+
+```{r biodiv4, echo=F, fig.cap = "Species richnes after 100 years by scenario"}
+
+VarStack = stack(BAU_SR0Mean, BAU_SR100Mean, Adapty_SR100Mean, ProAct_SR100Mean)
+  Title = "Number of species"
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.3(nbrks), legend = F, zlim=c(Min,Max), 
+main = names(VarStack))
+plot(rasTot, legend.only=TRUE, col=pal.3(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text=Title, side=4, font=2, line=2.5, cex=0.8))
+
+for(i in (1:4)){
+  export = raster(vals=getValues(VarStack[[i]]),
+                    nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
+                    xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
+  writeRaster(export,
+    filename =  paste0("D:/Internship 3A/Rasters/Diversity/",names(VarStack[[i]]),".tif"),
+    format = "GTiff", datatype ="FLT8S",overwrite=T)
+}
+
+```
+
+Species richness before and after the simulation shows a loss for the BAU scenario. Zones of maximal and minimal richness are not situated at the same place after 100 years. The adaptability scenario shows the same pattern that the BAU but with reduced richness. The important number of species planted in the Pro-active scenario (11) explain important zones of richness limited to the planted areas. Except for these plantations, the pattern of the final species richness seems on a stage intermediate between BAU and Adaptability.
+
+```{r biodiv5, echo=F, fig.cap = "Standard deviation on species richnes", message=F, warning=F}
+
+VarStack = stack(BAU_SR100Sd, Adapty_SR100Sd, ProAct_SR100Sd)
+  Title = "Standard deviation on number of species"
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.sd(nbrks), legend = F, zlim=c(Min,Max), 
+main = names(VarStack))
+plot(rasTot, legend.only=TRUE, col=pal.sd(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text=Title, side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+```{r biodiv6, echo=F, fig.cap = "Age richnes after 100 years by scenario"}
+
+VarStack = stack(BAU_AR0Mean, BAU_AR100Mean, Adapty_AR100Mean, ProAct_AR100Mean)
+  Title = "Number of unique ages"
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.3(nbrks), legend = F, zlim=c(Min,Max), 
+main = names(VarStack))
+plot(rasTot, legend.only=TRUE, col=pal.3(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text=Title, side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+```{r biodiv7, echo=F, fig.cap = "Standard deviation on age richnes"}
+
+VarStack = stack(BAU_AR100Sd, Adapty_AR100Sd, ProAct_AR100Sd)
+  Title = "Standard deviation on species richness"
+  Max = max(maxValue(VarStack))
+  Min = min(minValue(VarStack))
+  brks = seq(Min,Max,by=0.1)
+  nbrks = length(brks)-1
+  r.range = c(Min, Max)
+  rasTot = raster(ncol=2, nrow=1)
+  values(rasTot) = c(Min,Max)
+
+par(mfrow=c(1,3), mar=c(4.1, 0, 4.1, 10.1))
+
+plot(VarStack, breaks=brks,col=pal.sd(nbrks), legend = F, zlim=c(Min,Max), 
+main = names(VarStack))
+plot(rasTot, legend.only=TRUE, col=pal.sd(nbrks),
+    legend.width=1, legend.shrink=0.75,
+    legend.args=list(text=Title, side=4, font=2, line=2.5, cex=0.8))
+
+```
+
+```{r biodiv8, echo=F, message=F, warning=F}
+
+Biodiv_Sum = Biodiv %>% group_by(Scenario, Run) %>%
+      summarise(SppRich = mean(Spp_Rich),
+                AgeRich = mean(Age_Richness))
+
+Biodiv_AggT = Biodiv %>% group_by(Year, Scenario) %>%
+      summarise(SppRichMean = mean(Spp_Rich), SppRichSd = sd(Spp_Rich)*InvBessel,
+                AgeRichMean = mean(Age_Richness), AgeRichSd = sd(Age_Richness)*InvBessel)
+
+```
+
+```{r biodiv9, echo=F, fig.cap = " "}
+
+ggplot(Biodiv_AggT, aes(x=Year, y=SppRichMean, col=Scenario, group=Scenario)) +
+  geom_line(size = 1)+
+  geom_errorbar(aes(ymin=SppRichMean-SppRichSd, ymax=SppRichMean+SppRichSd)) +
+  xlab("Time (years)") +
+  ylab("Number of species") +
+  ggtitle("Evolution of number of species per cell on different scenarios") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r biodiv10, echo=F, fig.cap = " "}
+
+ggplot(Biodiv_AggT, aes(x=Year, y=AgeRichMean, col=Scenario, group=Scenario)) +
+  geom_line(size = 1)+
+  xlab("Time (years)") +
+  ylab("Number of unique ages") +
+  ggtitle("Evolution of age richness per cell on different scenarios") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+The average number of species by cell have the same general behavior in all the scenarios, with a decrease after the 60th year. For increasing species richness, the Pro-active scenario 
+
+```{r biodiv11, echo=F, fig.cap = " "}
+
+ggplot(Biodiv_AggT, aes(x=Year, y=AgeRichMean, col=Scenario, group=Scenario)) +
+  geom_line(size = 1)+
+  geom_errorbar(aes(ymin=AgeRichMean-AgeRichSd, ymax=AgeRichMean+AgeRichSd)) +
+  xlab("Time (years)") +
+  ylab("Number of unique ages") +
+  ggtitle("Evolution of age richness per cell on different scenarios") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
