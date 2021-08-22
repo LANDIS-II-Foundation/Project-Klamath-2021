@@ -12,3 +12,8 @@ Once downloaded and executed, these files will install the extentions used to ru
 
 For any supplementary information concerning the extentions (eg. the usefull user guides), please refer to http://www.landis-ii.org/extensions.
 
+# Authors
+
+The LANDIS-II Foundation
+
+Mail : rschell@ncsu.edu
