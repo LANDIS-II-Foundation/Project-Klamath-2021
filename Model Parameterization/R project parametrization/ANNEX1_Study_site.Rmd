@@ -14,7 +14,7 @@ output:
 Used pakages :
 
 ```{r setup, message=FALSE, warning=FALSE}
-wd = "D:/Internship 3A/GitHub/Project-Klamath-2021/Model Parameterization"
+wd = "D:/Internship 3A/GitHub/Project-Klamath-2021/Model Parameterization/R inputs and outputs"
 setwd(wd)
 library(sf)
 library(raster)
@@ -50,13 +50,13 @@ The two raster layers of the managment areas *Ownership_TotKlamath* and of the s
 ```{r import}
 
 ER_OnlyCA = 
-  paste0(wd,"/Study_site/ecoregions_v2.tif") %>% raster()
+  paste0(wd,"/ecoregions_v2.tif") %>% raster()
 
 Ownership_TotKlamath = 
-  paste0(wd,"/Study_site/E4_ownership_BAU_v4.tif") %>% raster()
+  paste0(wd,"/E4_ownership_BAU_v4.tif") %>% raster()
 
 Stands_TotKlamath = 
-  paste0(wd,"/Study_site/E4_stands_BAU_v5.tif") %>% raster()
+  paste0(wd,"/E4_stands_BAU_v5.tif") %>% raster()
 
 
 ```
@@ -186,20 +186,20 @@ Ownership_OnlyCA[is.na(Ownership_OnlyCA[])] = 0
 Stands_OnlyCA[is.na(Stands_OnlyCA[])] = 0
 
 writeRaster(Ownership_OnlyCA,
-            filename  = paste0(wd,"/Study_site/Ownership_OnlyCA.tif"),
+            filename  = paste0(wd,"/Ownership_OnlyCA.tif"),
             format = "GTiff", datatype ="INT1U",overwrite=T)
 
 writeRaster(Stands_OnlyCA,
-            filename  = paste0(wd,"/Study_site/Stands_OnlyCA.tif"),
+            filename  = paste0(wd,"/Stands_OnlyCA.tif"),
             format = "GTiff", datatype ="INT4S",overwrite=T)
 
 ```
 
 
 
-# III. Creation of the Resistence Management Areas
+# III. Creation of the Economic Resilience Management Areas
 
-The Pro-active management scenario have a resistence prescription. This consists on identifying climate refugias and apply a productive management with species traditionaly used on such places.
+The Pro-active management scenario have a Economic Resilience prescription. This consists on identifying climate refugias and apply a productive management with species traditionaly used on such places.
 
 As these refugias concentrate an important part of the economical insights, a buffer zone is created with intensive fire and insects prescriptions.
 
@@ -226,7 +226,7 @@ The first step is to identify the climate change refugias, i.e. zones where the 
 The proxy used to identify these zones are the soil moisture. This choice is justified and discussed in the report. Among the input files used in LANDIS-II, there is no raster of the soil moisture. The layer used here is the soil moisture modelled on year 1 by the NECN extention, in the scenario Business As Usual.
 
 ```{r sm}
-SoilMoist = paste0(wd, "/Study_site/Annual-water-budget-1.img") %>% raster()
+SoilMoist = paste0(wd, "/Annual-water-budget-1.img") %>% raster()
 
 plot(SoilMoist, main = "Figure 6: Soil moisture in the study site",  col = pal.2(300))
 
@@ -262,7 +262,7 @@ freq(SoilMoist, merge=T) %>% as.data.frame() %>% kable(caption = "Number of cell
 ```
 
 
-This zone of high soil moisture is considered as the potentials climate refugias and will be used for the resistence prescription.
+This zone of high soil moisture is considered as the potentials climate refugias and will be used for the Economic Resilience prescription.
 
 ## III.b) Creation of the buffer zone
 
@@ -277,7 +277,7 @@ Buf = raster(vals=getValues(Buf),
                     nrow=NrowRef,ncol=NcolRef,resolution=ResRef,
                     xmn=XminRef, xmx=XmaxRef,ymn =YminRef,ymx=YmaxRef,crs=CRSRef)
 
-plot(Buf, main = "Figure 8: Buffer zone around the resistence management area",
+plot(Buf, main = "Figure 8: Buffer zone around the Economic Resilience management area",
      legend = F, col = pal.2(1))
 
 freq(Buf, merge=T) %>% as.data.frame() %>% kable(caption = "Number of cells in the buffer raster by value")
@@ -292,7 +292,7 @@ The potential climate refugia raster and the buffer zone raster are merged.
 
 Resistence = cover(SoilMoist, Buf)
 
-plot(Resistence, main = "Figure 9: Buffer zone and resistence area ",
+plot(Resistence, main = "Figure 9: Buffer zone and Economic Resilience area ",
      legend = F, col = pal.2.op(2))
 
 ```
@@ -310,7 +310,7 @@ New_Ma = cover(Resistence, Ownership_OnlyCA)
 
 To obtain new codes for the cells situated on the resistence and buffer zones, a sum is performed.
 
-This way, the cells in question have new code that is different depending of if it is in the resistent area or the buffer zone.
+This way, the cells in question have new code that is different depending of if it is in the Economic Resilience area or the buffer zone.
 
 This new layer is then exported.
 
@@ -323,7 +323,7 @@ Buf[is.na(Buf)] = 0
 StandRefugia = Stands_OnlyCA + SoilMoist + Buf
 
 writeRaster(StandRefugia,
-filename =  paste0(wd,"/Study_site/Stand_CA_Refugias.tif"),
+filename =  paste0(wd,"/Stand_CA_Refugias.tif"),
 format = "GTiff", datatype ="INT4S",overwrite=T)
 
 ```
@@ -332,7 +332,7 @@ format = "GTiff", datatype ="INT4S",overwrite=T)
 
 The change on the stands operated before result on many stands being on different management areas. As this makes little sence on a practical point of view and is forbidden on LANDIS-II, the limits of the management areas are modified to make sure one stand is included in only one management area.
 
-In practice, there is no stands that where on more than two management areas, so the following script only deal with stands on two management areas, one of them being the buffer zone or the resistence area.
+In practice, there is no stands that where on more than two management areas, so the following script only deal with stands on two management areas, one of them being the buffer zone or the Economic Resilience area.
 
 ```{r verif}
 
@@ -385,7 +385,7 @@ Finally, this layer is exported and will be used on the Pro-active scenario alon
 MA_Refugia = Stack$New_Ma
 
 writeRaster(MA_Refugia,
-filename =  paste0(wd,"/Study_site/Ownership_CA_Refugias.tif"),
+filename =  paste0(wd,"/Ownership_CA_Refugias.tif"),
 format = "GTiff", datatype ="INT1U",overwrite=T)
 ```
 
@@ -405,7 +405,7 @@ plot(Ownership_OnlyCA, main="Figure 10: Managment areas (BAU and Adaptability)",
      col=pal.11(11))
 plot(MA_Refugia, main="Figure 11: Managment areas (Pro-Active)",
      col=pal.13(13))
-plot(MA_Refugia, main="Figure 12: Resistence area and buffer zone",
+plot(MA_Refugia, main="Figure 12: Economic Resilience area and buffer zone",
      col=pal.R(13))
 
 

@@ -156,13 +156,13 @@ plot_grid(SOMTp, CDWp, MNp, TNp, SNp, N1p, N2p, labels="AUTO", ncol = 2, nrow = 
 
 ```
 
-V4 is choosen
+The vertion 4 is the one selected.
 
 # III. Initial quantity of soil nitrogen
 
 ## III.a) Modification of initial nitrogen cocentration for a single cell raster
 
-It is observed 
+Because the surface nitrogen quantity seems higher than the landscape can equilibrate with, it was decided to change it. This modification was first done for the sigle cell simulation.
 
 ```{r SOM1}
 
@@ -198,6 +198,8 @@ writeRaster(Nsurf1, file=paste(files_dir,"som1nsurf_V1", sep=""),
 
 ## III.b) Modification of initial nitrogen cocentration for the initial raster
 
+The modification is then done for the raster used on the final simulations.
+
 ```{r SOM1.2}
 
 Nsoil1_Tot = paste(files_dir,"Tot/som1nsoil2.tif",sep="") %>% raster()
@@ -217,6 +219,7 @@ print(paste("Mean of SOM1 soil raster:", SoilMean, "Mean of SOM1 surface raster:
 
 ```
 
+The information above concern the nitrogen concentration before changing it.
 
 ```{r calc}
 
@@ -239,3 +242,4 @@ writeRaster(Nsoil1_New, file=paste(files_dir,"Tot/som1nsurf_V1_Tot", sep=""),
 
 ```
 
+The information above concern the nitrogen concentration after changing it. As wanted, the distribution seems unchanged.
