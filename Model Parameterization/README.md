@@ -1,7 +1,7 @@
 # Model Parametrisation
 All the modifications made to the inputs during the study are explained here.
+The input raster files for runing the codes, as well as the created ones, are available on the file **R inputs and outputs**.
 
-The scripts used to obtain the results from these outputs are available on this folder.
 The ".pdf" files are made for a more easy reading and are available on this folder.
 Both files (code and pdf) are referenced as mentioned in the report and form the annexes.
 
