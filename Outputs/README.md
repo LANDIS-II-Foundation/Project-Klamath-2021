@@ -12,4 +12,4 @@ Both files (code and pdf) are referenced as mentioned in the report and form the
 - **ANNEX6** aimed to explain why disturbancies (in particular fire) tends to disminish with time. An analyses of the Fire Weather Index is done as well as a comparison with results obtained with another climate model (CanSM).
 - **ANNEX7** gives insights of possibles analyses of migration.
 
-Due to issues related to data storage in different computers all along the realisation of the study, all the codes were not printed on pdf in time.
+Due to issues related to data storage in different computers all along the realisation of the study, all the codes were not printed on pdf in time. This will be updated as soon as possible.
