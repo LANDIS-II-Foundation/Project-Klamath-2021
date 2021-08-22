@@ -12,4 +12,4 @@ Both files (code and pdf) are referenced as mentioned in the report and form the
 Please note that it is not compulsary to run these codes to run the models. The data available on the **Input** folder is already modified and is ready to be used.
 
 
-Due to issues related to data storage in different computers all along the realisation of the study, the latest pdf vertion on ANNEX1 wasn't printed. The Rmd vertion is the latest one, The difference lays on the name of the Economic Resilience area, named before Resistance area.
+Due to issues related to data storage in different computers all along the realisation of the study, the latest pdf vertion on ANNEX1 wasn't printed. The Rmd vertion is the latest one, The difference lays on the name of the Economic Resilience area, named before Resistance area. This will be updated as soon as possible.
